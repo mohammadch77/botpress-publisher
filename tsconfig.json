@@ -1,0 +1,11 @@
+{
+    "extends": "@vue/tsconfig/tsconfig.dom.json",
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["./resources/js/admin/*"]
+        },
+        "types": ["node"]
+    },
+    "include": ["resources/js/admin/**/*.ts", "resources/js/admin/**/*.vue"]
+}
