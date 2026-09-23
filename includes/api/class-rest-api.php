@@ -138,6 +138,12 @@ class BotPress_REST_API {
             'permission_callback' => [$this, 'check_permission'],
         ]);
 
+        register_rest_route($this->namespace, '/settings/test-bot', [
+            'methods'             => 'POST',
+            'callback'            => [$this, 'test_bot'],
+            'permission_callback' => [$this, 'check_permission'],
+        ]);
+
         register_rest_route($this->namespace, '/webhook/set', [
             'methods'             => 'POST',
             'callback'            => [$this, 'set_webhook'],
@@ -301,6 +307,27 @@ class BotPress_REST_API {
         ], ['id' => $id]);
 
         return new WP_REST_Response(['success' => $success, 'result' => $result], 200);
+    }
+
+    public function test_bot(WP_REST_Request $request): WP_REST_Response {
+        $platform = (string) $request->get_param('platform');
+        if (!in_array($platform, ['telegram', 'bale'], true)) {
+            return new WP_REST_Response(['success' => false, 'message' => 'invalid_platform'], 400);
+        }
+
+        $driver = BotPress_Driver_Factory::make($platform);
+        if (!$driver) {
+            return new WP_REST_Response(['success' => false, 'message' => 'no_token'], 200);
+        }
+
+        $result = $driver->get_me();
+        $success = $result['ok'] ?? false;
+
+        return new WP_REST_Response([
+            'success'      => $success,
+            'bot_username' => $result['result']['username'] ?? null,
+            'message'      => $success ? null : ($result['description'] ?? 'unknown_error'),
+        ], 200);
     }
 
     public function get_settings(WP_REST_Request $request): WP_REST_Response {

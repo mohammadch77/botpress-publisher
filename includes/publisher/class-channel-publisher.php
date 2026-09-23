@@ -3,12 +3,6 @@
 defined('ABSPATH') || exit;
 
 class BotPress_Channel_Publisher {
-    private BotPress_Template_Engine $template_engine;
-
-    public function __construct() {
-        $this->template_engine = new BotPress_Template_Engine();
-    }
-
     public function publish_to_all(WP_Post $post): array {
         global $wpdb;
 
@@ -39,7 +33,8 @@ class BotPress_Channel_Publisher {
             ];
         }
 
-        $text = $this->template_engine->render($post);
+        $template_engine = new BotPress_Template_Engine('', $channel->platform);
+        $text = $template_engine->render($post);
         $image_url = (new BotPress_WordPress_Publisher())->get_featured_image_url($post->ID);
 
         $keyboard = [

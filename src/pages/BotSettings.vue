@@ -5,9 +5,29 @@
         <StatusDot :status="settings.telegram.connected ? 'active' : 'inactive'" />
       </template>
       <div class="flex flex-col gap-4">
-        <Input v-model="telegramToken" label="Bot Token" type="password" :placeholder="settings.telegram.token_masked || 'Enter token'" />
-        <div>
+        <div class="relative">
+          <Input
+            v-model="telegramToken"
+            label="Bot Token"
+            :type="showToken.telegram ? 'text' : 'password'"
+            :placeholder="settings.telegram.token_masked || 'Enter token'"
+          />
+          <button
+            type="button"
+            class="absolute left-2 top-8 text-slate-400 hover:text-slate-600"
+            @click="showToken.telegram = !showToken.telegram"
+          >
+            <component :is="showToken.telegram ? EyeOff : Eye" class="h-4 w-4" />
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
           <Button variant="primary" :loading="savingTelegram" @click="saveToken('telegram')">ذخیره توکن</Button>
+          <Button variant="outline" :loading="testingBot.telegram" :disabled="!settings.telegram.has_token" @click="testBot('telegram')">
+            Connection Test
+          </Button>
+          <span v-if="botTestResults.telegram" class="text-sm" :class="botTestResults.telegram.success ? 'text-emerald-600' : 'text-red-500'">
+            {{ botTestResults.telegram.success ? `متصل: @${botTestResults.telegram.bot_username || ''}` : botTestResults.telegram.message }}
+          </span>
         </div>
         <div class="flex items-end gap-2">
           <Input :model-value="settings.telegram.webhook_url" label="Webhook URL" disabled class="flex-1" />
@@ -29,9 +49,29 @@
         <StatusDot :status="settings.bale.connected ? 'active' : 'inactive'" />
       </template>
       <div class="flex flex-col gap-4">
-        <Input v-model="baleToken" label="Bot Token" type="password" :placeholder="settings.bale.token_masked || 'Enter token'" />
-        <div>
+        <div class="relative">
+          <Input
+            v-model="baleToken"
+            label="Bot Token"
+            :type="showToken.bale ? 'text' : 'password'"
+            :placeholder="settings.bale.token_masked || 'Enter token'"
+          />
+          <button
+            type="button"
+            class="absolute left-2 top-8 text-slate-400 hover:text-slate-600"
+            @click="showToken.bale = !showToken.bale"
+          >
+            <component :is="showToken.bale ? EyeOff : Eye" class="h-4 w-4" />
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
           <Button variant="primary" :loading="savingBale" @click="saveToken('bale')">ذخیره توکن</Button>
+          <Button variant="outline" :loading="testingBot.bale" :disabled="!settings.bale.has_token" @click="testBot('bale')">
+            Connection Test
+          </Button>
+          <span v-if="botTestResults.bale" class="text-sm" :class="botTestResults.bale.success ? 'text-emerald-600' : 'text-red-500'">
+            {{ botTestResults.bale.success ? `متصل: @${botTestResults.bale.bot_username || ''}` : botTestResults.bale.message }}
+          </span>
         </div>
         <div class="flex items-end gap-2">
           <Input :model-value="settings.bale.webhook_url" label="Webhook URL" disabled class="flex-1" />
@@ -76,6 +116,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { Eye, EyeOff } from 'lucide-vue-next'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Button from '@/components/ui/Button.vue'
@@ -93,6 +134,12 @@ const newUserId = ref('')
 const savingTelegram = ref(false)
 const savingBale = ref(false)
 const settingWebhook = reactive({ telegram: false, bale: false })
+const showToken = reactive({ telegram: false, bale: false })
+const testingBot = reactive({ telegram: false, bale: false })
+const botTestResults = reactive<Record<'telegram' | 'bale', { success: boolean; message?: string; bot_username?: string } | null>>({
+  telegram: null,
+  bale: null,
+})
 
 const settings = reactive<BotSettings>({
   telegram: { token_masked: '', has_token: false, webhook_url: '', webhook_set: false, connected: false },
@@ -132,6 +179,20 @@ async function setWebhook(platform: 'telegram' | 'bale') {
     await loadSettings()
   } finally {
     settingWebhook[platform] = false
+  }
+}
+
+async function testBot(platform: 'telegram' | 'bale') {
+  testingBot[platform] = true
+  try {
+    const { data } = await api.post('/settings/test-bot', { platform })
+    botTestResults[platform] = {
+      success: data.success,
+      message: data.message || 'اتصال ناموفق',
+      bot_username: data.bot_username,
+    }
+  } finally {
+    testingBot[platform] = false
   }
 }
 
