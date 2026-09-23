@@ -2,25 +2,95 @@
 
 defined('ABSPATH') || exit;
 
-/**
- * Telegram bot driver. Implementation lands in Phase 3.
- */
 class BotPress_Telegram_Driver implements BotPress_Bot_Driver_Interface {
+    private string $base_url = 'https://api.telegram.org/bot';
     private string $token;
 
     public function __construct(string $token) {
         $this->token = $token;
     }
 
-    public function send_message(string $chat_id, string $text, array $options = []): array {
-        return ['success' => false, 'error' => 'not_implemented'];
+    private function call(string $method, array $params = []): array {
+        $url = $this->base_url . $this->token . '/' . $method;
+
+        $response = wp_remote_post($url, [
+            'headers' => ['Content-Type' => 'application/json'],
+            'body'    => wp_json_encode($params),
+            'timeout' => 15,
+        ]);
+
+        if (is_wp_error($response)) {
+            return ['ok' => false, 'description' => $response->get_error_message()];
+        }
+
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        return $body ?? ['ok' => false, 'description' => 'Invalid response'];
     }
 
-    public function set_webhook(string $url): array {
-        return ['success' => false, 'error' => 'not_implemented'];
+    public function send_message(string $chat_id, string $text, array $options = []): array {
+        return $this->call('sendMessage', array_merge([
+            'chat_id'    => $chat_id,
+            'text'       => $text,
+            'parse_mode' => 'HTML',
+        ], $options));
+    }
+
+    public function send_photo(string $chat_id, string $photo_url, string $caption = '', array $options = []): array {
+        return $this->call('sendPhoto', array_merge([
+            'chat_id'    => $chat_id,
+            'photo'      => $photo_url,
+            'caption'    => $caption,
+            'parse_mode' => 'HTML',
+        ], $options));
+    }
+
+    public function edit_message(string $chat_id, int $message_id, string $text, array $options = []): array {
+        return $this->call('editMessageText', array_merge([
+            'chat_id'    => $chat_id,
+            'message_id' => $message_id,
+            'text'       => $text,
+            'parse_mode' => 'HTML',
+        ], $options));
+    }
+
+    public function delete_message(string $chat_id, int $message_id): bool {
+        $result = $this->call('deleteMessage', [
+            'chat_id'    => $chat_id,
+            'message_id' => $message_id,
+        ]);
+        return $result['ok'] ?? false;
+    }
+
+    public function answer_callback(string $callback_id, string $text = '', bool $show_alert = false): bool {
+        $result = $this->call('answerCallbackQuery', [
+            'callback_query_id' => $callback_id,
+            'text'              => $text,
+            'show_alert'        => $show_alert,
+        ]);
+        return $result['ok'] ?? false;
+    }
+
+    public function get_chat(string $chat_id): array {
+        return $this->call('getChat', ['chat_id' => $chat_id]);
     }
 
     public function get_me(): array {
-        return ['success' => false, 'error' => 'not_implemented'];
+        return $this->call('getMe');
+    }
+
+    public function set_webhook(string $url, string $secret = ''): array {
+        $params = ['url' => $url];
+        if ($secret) {
+            $params['secret_token'] = $secret;
+        }
+        return $this->call('setWebhook', $params);
+    }
+
+    public function delete_webhook(): array {
+        return $this->call('deleteWebhook');
+    }
+
+    public function get_platform(): string {
+        return 'telegram';
     }
 }

@@ -39,8 +39,18 @@ export interface QueueItem {
   scheduled_at: string
 }
 
+export interface PlatformSettings {
+  token_masked: string
+  has_token: boolean
+  webhook_url: string
+  webhook_set: boolean
+  connected: boolean
+}
+
 export interface BotSettings {
-  telegram: { token_masked: string; webhook_url: string; connected: boolean }
-  bale: { token_masked: string; webhook_url: string; connected: boolean }
+  telegram: PlatformSettings
+  bale: PlatformSettings
   authorized_users: string[]
+  notify_on_publish: boolean
+  notify_on_fail: boolean
 }
