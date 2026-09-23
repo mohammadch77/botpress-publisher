@@ -1,0 +1,5 @@
+/admin/
+/src/node_modules/
+/src/dist/
+*.log
+.DS_Store
