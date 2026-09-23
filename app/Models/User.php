@@ -36,6 +36,11 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class, 'user_roles')
@@ -72,5 +77,10 @@ class User extends Authenticatable
     public function hasRole(string $slug): bool
     {
         return $this->roles->contains('slug', $slug);
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole('super_admin');
     }
 }

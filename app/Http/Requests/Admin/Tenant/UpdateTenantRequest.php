@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests\Admin;
+namespace App\Http\Requests\Admin\Tenant;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -9,7 +9,7 @@ class UpdateTenantRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('update', $this->route('tenant')) ?? false;
     }
 
     public function rules(): array
@@ -21,6 +21,7 @@ class UpdateTenantRequest extends FormRequest
             'slug' => ['sometimes', 'string', 'max:100', 'alpha_dash', Rule::unique('tenants', 'slug')->ignore($tenant)],
             'plan' => ['sometimes', 'in:free,pro,enterprise'],
             'status' => ['sometimes', 'in:active,suspended,trial,cancelled'],
+            'settings' => ['sometimes', 'array'],
         ];
     }
 }

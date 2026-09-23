@@ -9,9 +9,16 @@ const router = useRouter();
 const navItems = [
     { name: 'dashboard', label: 'Dashboard' },
     { name: 'tenants', label: 'Tenants' },
+    { name: 'users', label: 'Users' },
     { name: 'bots', label: 'Bots' },
     { name: 'destinations', label: 'Destinations' },
-    { name: 'users', label: 'Users' },
+];
+
+const disabledNavItems = [
+    { label: 'Content' },
+    { label: 'Publications' },
+    { label: 'Logs' },
+    { label: 'Settings' },
 ];
 
 async function handleLogout() {
@@ -36,6 +43,15 @@ async function handleLogout() {
                 >
                     {{ item.label }}
                 </RouterLink>
+
+                <span
+                    v-for="item in disabledNavItems"
+                    :key="item.label"
+                    class="block cursor-not-allowed rounded-md px-3 py-2 text-sm font-medium text-surface-300"
+                    title="Coming in a later phase"
+                >
+                    {{ item.label }}
+                </span>
             </nav>
         </aside>
 

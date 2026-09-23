@@ -36,6 +36,11 @@ class Destination extends Model
         'metadata' => 'array',
     ];
 
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     public function wordpressSite(): HasOne
     {
         return $this->hasOne(WordPressSite::class);

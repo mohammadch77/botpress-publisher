@@ -44,6 +44,11 @@ class Bot extends Model
         'metadata' => 'array',
     ];
 
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     public function conversationSessions(): HasMany
     {
         return $this->hasMany(ConversationSession::class);

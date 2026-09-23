@@ -28,20 +28,17 @@ const router = createRouter({
                 {
                     path: 'bots',
                     name: 'bots',
-                    component: () => import('@/pages/dashboard/Placeholder.vue'),
-                    props: { title: 'Bots' },
+                    component: () => import('@/pages/bots/Index.vue'),
                 },
                 {
                     path: 'destinations',
                     name: 'destinations',
-                    component: () => import('@/pages/dashboard/Placeholder.vue'),
-                    props: { title: 'Destinations' },
+                    component: () => import('@/pages/destinations/Index.vue'),
                 },
                 {
                     path: 'users',
                     name: 'users',
-                    component: () => import('@/pages/dashboard/Placeholder.vue'),
-                    props: { title: 'Users' },
+                    component: () => import('@/pages/users/Index.vue'),
                 },
             ],
         },

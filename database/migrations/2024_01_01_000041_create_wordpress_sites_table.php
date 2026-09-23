@@ -31,7 +31,9 @@ return new class extends Migration
             $table->index('tenant_id', 'idx_wp_sites_tenant');
         });
 
-        DB::statement('ALTER TABLE wordpress_sites ADD INDEX idx_wp_sites_url (url(191))');
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE wordpress_sites ADD INDEX idx_wp_sites_url (url(191))');
+        }
     }
 
     public function down(): void

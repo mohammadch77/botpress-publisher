@@ -23,6 +23,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'webhook/*',
         ]);
+
+        $middleware->alias([
+            'tenant' => \App\Http\Middleware\SetTenantContext::class,
+            'tenant.active' => \App\Http\Middleware\EnsureTenantIsActive::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

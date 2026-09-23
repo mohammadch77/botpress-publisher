@@ -12,6 +12,8 @@ class WordPressSite extends Model
 {
     use BelongsToTenant;
 
+    protected $table = 'wordpress_sites';
+
     protected $fillable = [
         'destination_id',
         'tenant_id',
