@@ -45,6 +45,19 @@ class BotPress_Queue_Manager {
         );
     }
 
+    public function retry(int $queue_id): bool {
+        global $wpdb;
+        return (bool) $wpdb->update(
+            $wpdb->prefix . 'botpress_publish_queue',
+            [
+                'status'     => 'pending',
+                'last_error' => null,
+                'updated_at' => current_time('mysql'),
+            ],
+            ['id' => $queue_id, 'status' => 'failed']
+        );
+    }
+
     public function cancel_by_post(int $post_id): bool {
         global $wpdb;
         return (bool) $wpdb->update(

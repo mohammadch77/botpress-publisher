@@ -51,6 +51,7 @@
     <Card title="Authorized Users">
       <div class="flex flex-col gap-3">
         <p class="text-sm text-slate-500">Telegram/Bale user IDs allowed to control the bot.</p>
+        <p class="text-xs text-slate-400">اگر لیست خالی باشد، همه کاربران می‌توانند از ربات استفاده کنند.</p>
         <div class="flex items-end gap-2">
           <Input v-model="newUserId" label="User ID" placeholder="123456789" class="flex-1" />
           <Button variant="outline" @click="addUser">افزودن</Button>
@@ -81,7 +82,10 @@ import Button from '@/components/ui/Button.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { api } from '@/utils/api'
+import { useToast } from '@/composables/useToast'
 import type { BotSettings } from '@/types'
+
+const toast = useToast()
 
 const telegramToken = ref('')
 const baleToken = ref('')
@@ -113,6 +117,7 @@ async function saveToken(platform: 'telegram' | 'bale') {
     await api.post('/settings', { [`${platform}_token`]: token })
     if (platform === 'telegram') telegramToken.value = ''
     else baleToken.value = ''
+    toast.success('توکن ذخیره شد.')
     await loadSettings()
   } finally {
     savingRef.value = false
@@ -122,7 +127,8 @@ async function saveToken(platform: 'telegram' | 'bale') {
 async function setWebhook(platform: 'telegram' | 'bale') {
   settingWebhook[platform] = true
   try {
-    await api.post('/webhook/set', { platform })
+    const { data } = await api.post('/webhook/set', { platform })
+    toast[data.success ? 'success' : 'error'](data.success ? 'وب‌هوک با موفقیت تنظیم شد.' : 'خطا در تنظیم وب‌هوک.')
     await loadSettings()
   } finally {
     settingWebhook[platform] = false
@@ -142,6 +148,7 @@ async function addUser() {
   const users = [...settings.authorized_users, newUserId.value.trim()]
   await api.post('/settings', { authorized_users: users })
   newUserId.value = ''
+  toast.success('کاربر افزوده شد.')
   await loadSettings()
 }
 

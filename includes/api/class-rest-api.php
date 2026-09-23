@@ -70,6 +70,12 @@ class BotPress_REST_API {
             ],
         ]);
 
+        register_rest_route($this->namespace, '/logs/export', [
+            'methods'             => 'GET',
+            'callback'            => [$this, 'export_logs'],
+            'permission_callback' => [$this, 'check_permission'],
+        ]);
+
         register_rest_route($this->namespace, '/queue', [
             [
                 'methods'             => 'GET',
@@ -86,6 +92,12 @@ class BotPress_REST_API {
         register_rest_route($this->namespace, '/queue/(?P<id>\d+)', [
             'methods'             => 'DELETE',
             'callback'            => [$this, 'cancel_queue_item'],
+            'permission_callback' => [$this, 'check_permission'],
+        ]);
+
+        register_rest_route($this->namespace, '/queue/(?P<id>\d+)/retry', [
+            'methods'             => 'POST',
+            'callback'            => [$this, 'retry_queue_item'],
             'permission_callback' => [$this, 'check_permission'],
         ]);
 
@@ -365,6 +377,24 @@ class BotPress_REST_API {
             $values[] = $action;
         }
 
+        $search = (string) $request->get_param('search');
+        if ($search !== '') {
+            $where[] = 'message LIKE %s';
+            $values[] = '%' . $wpdb->esc_like($search) . '%';
+        }
+
+        $from = (string) $request->get_param('from');
+        if ($from !== '') {
+            $where[] = 'created_at >= %s';
+            $values[] = $from . ' 00:00:00';
+        }
+
+        $to = (string) $request->get_param('to');
+        if ($to !== '') {
+            $where[] = 'created_at <= %s';
+            $values[] = $to . ' 23:59:59';
+        }
+
         $where_sql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
         $per_page = max(1, min(100, (int) ($request->get_param('per_page') ?: 20)));
@@ -389,6 +419,55 @@ class BotPress_REST_API {
         global $wpdb;
         $wpdb->query("TRUNCATE TABLE {$wpdb->prefix}botpress_logs");
         return new WP_REST_Response(['success' => true], 200);
+    }
+
+    public function export_logs(WP_REST_Request $request) {
+        global $wpdb;
+
+        $where = [];
+        $values = [];
+
+        $platform = (string) $request->get_param('platform');
+        if ($platform !== '') {
+            $where[] = 'platform = %s';
+            $values[] = $platform;
+        }
+
+        $status = (string) $request->get_param('status');
+        if ($status !== '') {
+            $where[] = 'status = %s';
+            $values[] = $status;
+        }
+
+        $from = (string) $request->get_param('from');
+        if ($from !== '') {
+            $where[] = 'created_at >= %s';
+            $values[] = $from . ' 00:00:00';
+        }
+
+        $to = (string) $request->get_param('to');
+        if ($to !== '') {
+            $where[] = 'created_at <= %s';
+            $values[] = $to . ' 23:59:59';
+        }
+
+        $where_sql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+        $sql = "SELECT created_at, action, platform, status, message FROM {$wpdb->prefix}botpress_logs {$where_sql} ORDER BY id DESC";
+        $rows = $wpdb->get_results($values ? $wpdb->prepare($sql, $values) : $sql);
+
+        $handle = fopen('php://temp', 'w+');
+        fputcsv($handle, ['Date', 'Action', 'Platform', 'Status', 'Message']);
+        foreach ($rows as $row) {
+            fputcsv($handle, [$row->created_at, $row->action, $row->platform, $row->status, $row->message]);
+        }
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="botpress-logs.csv"');
+        echo "\xEF\xBB\xBF" . $csv;
+        exit;
     }
 
     public function get_queue(WP_REST_Request $request): WP_REST_Response {
@@ -446,6 +525,12 @@ class BotPress_REST_API {
         return new WP_REST_Response(['success' => $success], $success ? 200 : 400);
     }
 
+    public function retry_queue_item(WP_REST_Request $request): WP_REST_Response {
+        $id = (int) $request->get_param('id');
+        $success = (new BotPress_Queue_Manager())->retry($id);
+        return new WP_REST_Response(['success' => $success], $success ? 200 : 400);
+    }
+
     public function get_posts(WP_REST_Request $request): WP_REST_Response {
         $posts = get_posts([
             'post_type'      => 'post',
@@ -466,15 +551,21 @@ class BotPress_REST_API {
     }
 
     public function get_templates(WP_REST_Request $request): WP_REST_Response {
-        return new WP_REST_Response([
-            'template'  => get_option('botpress_default_template', ''),
-            'variables' => BotPress_Template_Engine::available_variables(),
-        ], 200);
+        return new WP_REST_Response(
+            array_merge(
+                BotPress_Template_Engine::get_templates(),
+                ['variables' => BotPress_Template_Engine::available_variables()]
+            ),
+            200
+        );
     }
 
     public function save_template(WP_REST_Request $request): WP_REST_Response {
-        $template = (string) $request->get_param('template');
-        update_option('botpress_default_template', wp_kses_post($template));
+        BotPress_Template_Engine::save_templates([
+            'default'  => (string) $request->get_param('default'),
+            'telegram' => (string) $request->get_param('telegram'),
+            'bale'     => (string) $request->get_param('bale'),
+        ]);
         return new WP_REST_Response(['success' => true], 200);
     }
 

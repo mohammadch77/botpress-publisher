@@ -33,6 +33,7 @@ require_once BOTPRESS_PATH . 'includes/bot/class-message-builder.php';
 require_once BOTPRESS_PATH . 'includes/bot/commands/class-base-command.php';
 require_once BOTPRESS_PATH . 'includes/bot/commands/class-start-command.php';
 require_once BOTPRESS_PATH . 'includes/bot/commands/class-posts-command.php';
+require_once BOTPRESS_PATH . 'includes/bot/commands/class-search-command.php';
 require_once BOTPRESS_PATH . 'includes/bot/commands/class-post-detail-command.php';
 require_once BOTPRESS_PATH . 'includes/bot/commands/class-schedule-command.php';
 require_once BOTPRESS_PATH . 'includes/bot/commands/class-publish-command.php';

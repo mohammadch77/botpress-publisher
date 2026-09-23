@@ -1,8 +1,17 @@
 <template>
   <div class="flex h-screen bg-surface-1">
+    <div
+      v-if="mobileOpen"
+      class="fixed inset-0 z-30 bg-slate-900/40 md:hidden"
+      @click="mobileOpen = false"
+    />
     <aside
       class="flex flex-col border-r border-surface-3 bg-white transition-all"
-      :class="appStore.sidebarCollapsed ? 'w-16' : 'w-60'"
+      :class="[
+        appStore.sidebarCollapsed ? 'w-16' : 'w-60',
+        'fixed inset-y-0 z-40 md:static',
+        mobileOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0',
+      ]"
     >
       <div class="flex items-center gap-2 px-4 py-5">
         <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-white">
@@ -34,10 +43,15 @@
     </aside>
 
     <div class="flex flex-1 flex-col overflow-hidden">
-      <header class="flex items-center justify-between border-b border-surface-3 bg-white px-6 py-4">
-        <h1 class="text-lg font-semibold text-slate-800">{{ appStore.pageTitle }}</h1>
+      <header class="flex items-center justify-between border-b border-surface-3 bg-white px-4 py-4 md:px-6">
+        <div class="flex items-center gap-3">
+          <button class="text-slate-500 md:hidden" @click="mobileOpen = true">
+            <Menu class="h-5 w-5" />
+          </button>
+          <h1 class="text-lg font-semibold text-slate-800">{{ appStore.pageTitle }}</h1>
+        </div>
         <div class="flex items-center gap-4">
-          <div class="flex items-center gap-2 text-sm text-slate-500">
+          <div class="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
             <StatusDot :status="appStore.botConnected ? 'active' : 'inactive'" />
             {{ appStore.botConnected ? 'Bot Connected' : 'Bot Disconnected' }}
           </div>
@@ -47,7 +61,7 @@
         </div>
       </header>
 
-      <main class="flex-1 overflow-y-auto p-6">
+      <main class="flex-1 overflow-y-auto p-4 md:p-6">
         <slot />
       </main>
     </div>
@@ -55,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   LayoutDashboard,
@@ -67,6 +81,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Clock,
+  Menu,
 } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
@@ -76,6 +91,7 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const route = useRoute()
 const version = authStore.version
+const mobileOpen = ref(false)
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -92,5 +108,12 @@ watch(
     if (typeof title === 'string') appStore.setPageTitle(title)
   },
   { immediate: true }
+)
+
+watch(
+  () => route.path,
+  () => {
+    mobileOpen.value = false
+  }
 )
 </script>

@@ -5,15 +5,47 @@ defined('ABSPATH') || exit;
 class BotPress_Template_Engine {
     private string $template;
 
-    public function __construct(string $template = '') {
-        $this->template = $template !== '' ? $template : get_option(
-            'botpress_default_template',
-            self::default_template()
-        );
+    public function __construct(string $template = '', string $platform = 'default') {
+        $this->template = $template !== '' ? $template : self::get_template($platform);
     }
 
     public static function default_template(): string {
         return "📌 <b>{title}</b>\n\n{excerpt}\n\n🔗 <a href=\"{url}\">ادامه مطلب</a>";
+    }
+
+    public static function get_templates(): array {
+        $stored = get_option('botpress_templates', null);
+        if (is_array($stored)) {
+            return array_merge(
+                ['default' => self::default_template(), 'telegram' => '', 'bale' => ''],
+                $stored
+            );
+        }
+
+        // Migrate legacy single-template option.
+        $legacy = get_option('botpress_default_template', '');
+        return [
+            'default'  => $legacy !== '' ? $legacy : self::default_template(),
+            'telegram' => '',
+            'bale'     => '',
+        ];
+    }
+
+    public static function get_template(string $platform = 'default'): string {
+        $templates = self::get_templates();
+        if (!empty($templates[$platform])) {
+            return $templates[$platform];
+        }
+        return $templates['default'] ?: self::default_template();
+    }
+
+    public static function save_templates(array $templates): void {
+        $clean = [
+            'default'  => wp_kses_post((string) ($templates['default'] ?? self::default_template())),
+            'telegram' => wp_kses_post((string) ($templates['telegram'] ?? '')),
+            'bale'     => wp_kses_post((string) ($templates['bale'] ?? '')),
+        ];
+        update_option('botpress_templates', $clean);
     }
 
     public function render(WP_Post $post): string {

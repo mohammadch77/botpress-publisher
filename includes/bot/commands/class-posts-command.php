@@ -3,19 +3,45 @@
 defined('ABSPATH') || exit;
 
 class BotPress_Posts_Command extends BotPress_Base_Command {
+    private const FILTER_MAP = [
+        'draft'     => ['draft'],
+        'published' => ['publish'],
+        'scheduled' => ['future'],
+    ];
+
     public function handle(array $context): array {
-        return $this->send_list($context['driver'], $context['chat_id']);
+        $filter = strtolower($context['args'][0] ?? '');
+        $statuses = self::FILTER_MAP[$filter] ?? ['draft', 'publish', 'future'];
+        $offset = (int) ($context['args'][1] ?? 0);
+        return $this->send_list($context['driver'], $context['chat_id'], $statuses, $offset);
     }
 
     public function handle_callback(array $context): array {
-        return $this->send_list($context['driver'], $context['chat_id'], (int) $context['message_id']);
+        [$filter, $offset] = array_pad(explode('|', (string) $context['value']), 2, '0');
+        $statuses = self::FILTER_MAP[$filter] ?? ['draft', 'publish', 'future'];
+        return $this->send_list($context['driver'], $context['chat_id'], $statuses, (int) $offset, (int) $context['message_id']);
     }
 
-    private function send_list(BotPress_Bot_Driver_Interface $driver, string $chat_id, ?int $message_id = null): array {
+    private function send_list(
+        BotPress_Bot_Driver_Interface $driver,
+        string $chat_id,
+        array $statuses,
+        int $offset = 0,
+        ?int $message_id = null
+    ): array {
+        $per_page = 10;
+        $total = count(get_posts([
+            'post_type'      => 'post',
+            'post_status'    => $statuses,
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+        ]));
+
         $posts = get_posts([
             'post_type'      => 'post',
-            'post_status'    => ['draft', 'publish', 'future'],
-            'posts_per_page' => 10,
+            'post_status'    => $statuses,
+            'posts_per_page' => $per_page,
+            'offset'         => $offset,
             'orderby'        => 'date',
             'order'          => 'DESC',
         ]);
@@ -27,9 +53,9 @@ class BotPress_Posts_Command extends BotPress_Base_Command {
                 : $driver->send_message($chat_id, $text);
         }
 
-        $text = "📋 <b>مقالات اخیر</b>\n\n";
+        $text = "📋 <b>مقالات</b> ({$total})\n\n";
         $buttons = [];
-        $i = 1;
+        $i = $offset + 1;
         foreach ($posts as $post) {
             $status = $post->post_status === 'publish' ? 'published' : $post->post_status;
             $text .= "{$i}. " . esc_html($post->post_title) . " — <i>{$status}</i>\n";
@@ -40,6 +66,14 @@ class BotPress_Posts_Command extends BotPress_Base_Command {
             $i++;
         }
         $text .= "\nبرای جزئیات روی دکمه‌ها کلیک کنید:";
+
+        $filter_key = array_search($statuses, self::FILTER_MAP, true) ?: '';
+        if ($offset + $per_page < $total) {
+            $buttons[] = [[
+                'text'          => 'بیشتر ⏭',
+                'callback_data' => 'posts_list:' . $filter_key . '|' . ($offset + $per_page),
+            ]];
+        }
 
         $options = $this->inline_keyboard($buttons);
 

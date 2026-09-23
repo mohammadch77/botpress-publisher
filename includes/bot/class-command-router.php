@@ -65,6 +65,9 @@ class BotPress_Command_Router {
             case '/posts':
                 (new BotPress_Posts_Command())->handle($context);
                 break;
+            case '/search':
+                (new BotPress_Search_Command())->handle($context);
+                break;
             case '/post':
                 (new BotPress_Post_Detail_Command())->handle($context);
                 break;

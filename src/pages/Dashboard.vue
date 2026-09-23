@@ -1,5 +1,18 @@
 <template>
   <div class="flex flex-col gap-6">
+    <Card title="System Status">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="flex items-center gap-2 text-sm">
+          <StatusDot :status="botSettings.telegram.connected ? 'active' : 'inactive'" />
+          Telegram Bot — {{ botSettings.telegram.connected ? 'متصل' : 'قطع' }}
+        </div>
+        <div class="flex items-center gap-2 text-sm">
+          <StatusDot :status="botSettings.bale.connected ? 'active' : 'inactive'" />
+          Bale Bot — {{ botSettings.bale.connected ? 'متصل' : 'قطع' }}
+        </div>
+      </div>
+    </Card>
+
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard label="Total Channels" :value="stats.total_channels" :icon="Radio" :loading="loading" />
       <StatCard label="Published Today" :value="stats.published_today" :icon="Send" :loading="loading" />
@@ -11,7 +24,13 @@
         class="cursor-pointer transition hover:border-brand-300 hover:shadow-md"
         @click="router.push('/queue')"
       />
-      <StatCard label="Failed Today" :value="stats.failed_today" :icon="AlertTriangle" :loading="loading" />
+      <StatCard
+        label="Failed Today"
+        :value="stats.failed_today"
+        :icon="AlertTriangle"
+        :loading="loading"
+        :class="stats.failed_today > 0 ? 'border-red-300' : ''"
+      />
     </div>
 
     <Card title="Recent Activity">
@@ -29,22 +48,34 @@
       </Table>
     </Card>
 
-    <Card title="Quick Publish">
-      <div class="flex flex-wrap items-end gap-3">
-        <Input v-model="quickPostId" label="Post ID" placeholder="42" />
-        <Button variant="primary" :icon-left="Send" :loading="publishing" @click="handleQuickPublish">
-          Publish Now
-        </Button>
+    <Card title="Quick Actions">
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-wrap items-end gap-3">
+          <Input v-model="quickPostId" label="Post ID" placeholder="42" />
+          <Button variant="primary" :icon-left="Send" :loading="publishing" @click="handleQuickPublish">
+            Publish Now
+          </Button>
+        </div>
+        <p v-if="quickPublishMessage" class="text-sm" :class="quickPublishSuccess ? 'text-emerald-600' : 'text-red-500'">
+          {{ quickPublishMessage }}
+        </p>
+
+        <div class="flex flex-wrap items-end gap-3 border-t border-surface-3 pt-4">
+          <Input v-model="scheduleForm.postId" label="Post ID" placeholder="42" />
+          <DateTimePicker v-model="scheduleForm.scheduledAt" label="Scheduled At" />
+          <Button variant="secondary" :loading="scheduling" @click="handleQuickSchedule">Schedule</Button>
+          <router-link to="/queue" class="text-sm text-brand-600 hover:underline">View Queue →</router-link>
+        </div>
+        <p v-if="scheduleMessage" class="text-sm" :class="scheduleSuccess ? 'text-emerald-600' : 'text-red-500'">
+          {{ scheduleMessage }}
+        </p>
       </div>
-      <p v-if="quickPublishMessage" class="mt-3 text-sm" :class="quickPublishSuccess ? 'text-emerald-600' : 'text-red-500'">
-        {{ quickPublishMessage }}
-      </p>
     </Card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Radio, Send, Clock, AlertTriangle } from 'lucide-vue-next'
 import StatCard from '@/components/ui/StatCard.vue'
@@ -53,9 +84,13 @@ import Table from '@/components/ui/Table.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import DateTimePicker from '@/components/ui/DateTimePicker.vue'
+import StatusDot from '@/components/ui/StatusDot.vue'
 import { api } from '@/utils/api'
-import type { DashboardStats } from '@/types'
+import { useToast } from '@/composables/useToast'
+import type { BotSettings, DashboardStats } from '@/types'
 
+const toast = useToast()
 const router = useRouter()
 const loading = ref(true)
 const stats = reactive<DashboardStats>({
@@ -66,10 +101,20 @@ const stats = reactive<DashboardStats>({
   recent_activity: [],
 })
 
+const botSettings = reactive<Pick<BotSettings, 'telegram' | 'bale'>>({
+  telegram: { token_masked: '', has_token: false, webhook_url: '', webhook_set: false, connected: false },
+  bale: { token_masked: '', has_token: false, webhook_url: '', webhook_set: false, connected: false },
+})
+
 const quickPostId = ref('')
 const publishing = ref(false)
 const quickPublishMessage = ref('')
 const quickPublishSuccess = ref(false)
+
+const scheduleForm = reactive({ postId: '', scheduledAt: '' })
+const scheduling = ref(false)
+const scheduleMessage = ref('')
+const scheduleSuccess = ref(false)
 
 const columns = [
   { key: 'action', label: 'Action' },
@@ -77,6 +122,8 @@ const columns = [
   { key: 'status', label: 'Status' },
   { key: 'created_at', label: 'Time' },
 ]
+
+let refreshTimer: ReturnType<typeof setInterval> | undefined
 
 async function fetchStats() {
   loading.value = true
@@ -86,6 +133,12 @@ async function fetchStats() {
   } finally {
     loading.value = false
   }
+}
+
+async function fetchBotSettings() {
+  const { data } = await api.get('/settings')
+  botSettings.telegram = data.telegram
+  botSettings.bale = data.bale
 }
 
 async function handleQuickPublish() {
@@ -104,6 +157,7 @@ async function handleQuickPublish() {
     quickPublishMessage.value = data.success
       ? 'مقاله با موفقیت منتشر شد.'
       : data.wordpress?.error || 'انتشار با خطا مواجه شد.'
+    if (data.success) toast.success('مقاله منتشر شد.')
     await fetchStats()
   } catch {
     quickPublishSuccess.value = false
@@ -113,5 +167,41 @@ async function handleQuickPublish() {
   }
 }
 
-onMounted(fetchStats)
+async function handleQuickSchedule() {
+  const postId = Number(scheduleForm.postId)
+  if (!postId || !scheduleForm.scheduledAt) {
+    scheduleSuccess.value = false
+    scheduleMessage.value = 'شناسه مقاله و زمان الزامی است.'
+    return
+  }
+  scheduling.value = true
+  scheduleMessage.value = ''
+  try {
+    const scheduledAt = scheduleForm.scheduledAt.replace('T', ' ') + ':00'
+    const { data } = await api.post('/queue', { post_id: postId, scheduled_at: scheduledAt, target: 'both' })
+    scheduleSuccess.value = !!data.success
+    scheduleMessage.value = data.success ? 'زمان‌بندی شد.' : data.message || 'خطا در زمان‌بندی.'
+    if (data.success) {
+      toast.success('به صف زمان‌بندی اضافه شد.')
+      scheduleForm.postId = ''
+      scheduleForm.scheduledAt = ''
+      await fetchStats()
+    }
+  } finally {
+    scheduling.value = false
+  }
+}
+
+onMounted(() => {
+  fetchStats()
+  fetchBotSettings()
+  refreshTimer = setInterval(() => {
+    fetchStats()
+    fetchBotSettings()
+  }, 60000)
+})
+
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
+})
 </script>

@@ -11,12 +11,22 @@
           <Badge :variant="row.platform === 'telegram' ? 'info' : 'success'">{{ row.platform }}</Badge>
         </template>
         <template #cell-is_active="{ row }">
-          <StatusDot :status="row.last_error ? 'error' : row.is_active ? 'active' : 'inactive'" />
+          <span :title="row.last_error || ''" class="flex items-center gap-2">
+            <StatusDot :status="row.last_error ? 'error' : row.last_used_at ? 'active' : 'inactive'" />
+            <span class="text-xs text-slate-400">
+              {{ row.last_error ? 'خطا' : row.last_used_at ? formatDate(row.last_used_at) : 'تست نشده' }}
+            </span>
+          </span>
         </template>
         <template #cell-actions="{ row }">
-          <div class="flex gap-2">
-            <Button variant="ghost" size="sm" :loading="testingId === row.id" @click="testChannel(row as Channel)">Test</Button>
-            <Button variant="ghost" size="sm" @click="confirmDelete(row as Channel)">Delete</Button>
+          <div class="flex flex-col gap-1">
+            <div class="flex gap-2">
+              <Button variant="ghost" size="sm" :loading="testingId === row.id" @click="testChannel(row as Channel)">Test</Button>
+              <Button variant="ghost" size="sm" @click="confirmDelete(row as Channel)">Delete</Button>
+            </div>
+            <p v-if="testResults[row.id]" class="text-xs" :class="testResults[row.id].success ? 'text-emerald-600' : 'text-red-500'">
+              {{ testResults[row.id].success ? `متصل: @${testResults[row.id].bot_username || ''}` : testResults[row.id].message }}
+            </p>
           </div>
         </template>
       </Table>
@@ -43,17 +53,13 @@
       </div>
     </Modal>
 
-    <Modal v-model="showDeleteModal" title="Delete Channel" size="sm">
-      <div class="flex flex-col gap-4">
-        <p class="text-sm text-slate-600">
-          آیا از حذف کانال «{{ channelToDelete?.name }}» مطمئن هستید؟
-        </p>
-        <div class="flex justify-end gap-2">
-          <Button variant="ghost" @click="showDeleteModal = false">Cancel</Button>
-          <Button variant="danger" :loading="deleting" @click="deleteChannel">Delete</Button>
-        </div>
-      </div>
-    </Modal>
+    <ConfirmDialog
+      v-model="showDeleteModal"
+      title="Delete Channel"
+      :message="`آیا از حذف کانال «${channelToDelete?.name}» مطمئن هستید؟`"
+      :loading="deleting"
+      @confirm="deleteChannel"
+    />
   </div>
 </template>
 
@@ -68,9 +74,12 @@ import Modal from '@/components/ui/Modal.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { api } from '@/utils/api'
+import { useToast } from '@/composables/useToast'
 import type { Channel } from '@/types'
 
+const toast = useToast()
 const loading = ref(true)
 const saving = ref(false)
 const deleting = ref(false)
@@ -81,6 +90,7 @@ const showDeleteModal = ref(false)
 const channelToDelete = ref<Channel | null>(null)
 const formError = ref('')
 const form = reactive({ name: '', platform: 'telegram', chat_id: '', bot_token: '' })
+const testResults = reactive<Record<number, { success: boolean; message?: string; bot_username?: string }>>({})
 
 const columns = [
   { key: 'name', label: 'Name' },
@@ -115,14 +125,19 @@ async function saveChannel() {
     formError.value = 'همه فیلدها الزامی هستند.'
     return
   }
+  if (!form.chat_id.startsWith('-')) {
+    formError.value = 'شناسه کانال باید با - شروع شود.'
+    return
+  }
   saving.value = true
   formError.value = ''
   try {
     await api.post('/channels', { ...form })
     showModal.value = false
+    toast.success('کانال با موفقیت اضافه شد.')
     await loadChannels()
-  } catch (e) {
-    formError.value = 'خطا در ذخیره کانال.'
+  } catch (e: any) {
+    formError.value = e?.response?.data?.message || 'خطا در ذخیره کانال.'
   } finally {
     saving.value = false
   }
@@ -131,7 +146,12 @@ async function saveChannel() {
 async function testChannel(row: Channel) {
   testingId.value = row.id
   try {
-    await api.post(`/channels/${row.id}/test`)
+    const { data } = await api.post(`/channels/${row.id}/test`)
+    testResults[row.id] = {
+      success: data.success,
+      message: data.result?.description || 'اتصال ناموفق',
+      bot_username: data.result?.result?.username,
+    }
     await loadChannels()
   } finally {
     testingId.value = null
@@ -149,10 +169,15 @@ async function deleteChannel() {
   try {
     await api.delete(`/channels/${channelToDelete.value.id}`)
     showDeleteModal.value = false
+    toast.success('کانال حذف شد.')
     await loadChannels()
   } finally {
     deleting.value = false
   }
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString()
 }
 
 onMounted(loadChannels)

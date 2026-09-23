@@ -1,12 +1,28 @@
 <template>
   <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-    <Card title="Message Template">
+    <Card title="Message Templates">
       <div class="flex flex-col gap-4">
+        <div class="flex gap-2">
+          <button
+            v-for="tab in tabs"
+            :key="tab.key"
+            class="rounded-lg px-3 py-1.5 text-sm font-medium"
+            :class="activeTab === tab.key ? 'bg-brand-500 text-white' : 'bg-surface-2 text-slate-600'"
+            @click="activeTab = tab.key"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+
         <textarea
-          v-model="template"
+          v-model="templates[activeTab]"
           rows="10"
           class="btn-focus rounded-lg border border-surface-3 p-3 font-mono text-sm text-slate-800"
         />
+        <p class="text-xs" :class="charCount > 4096 ? 'text-red-500' : 'text-slate-400'">
+          {{ charCount }} / 4096 کاراکتر (محدودیت تلگرام)
+        </p>
+
         <div class="flex flex-wrap gap-2">
           <Badge
             v-for="(description, variable) in variables"
@@ -29,8 +45,8 @@
 
     <Card title="Preview">
       <div class="rounded-lg border border-surface-3 bg-surface-1 p-4">
-        <div class="mx-auto max-w-sm rounded-2xl bg-[#efeae2] p-3">
-          <div class="whitespace-pre-wrap rounded-lg bg-white p-3 text-sm text-slate-800 shadow-sm" v-html="preview" />
+        <div class="mx-auto max-w-sm rounded-2xl bg-[#5288c1] p-3">
+          <div class="whitespace-pre-wrap rounded-lg rounded-tl-none bg-white p-3 text-sm text-slate-800 shadow-sm" v-html="preview" />
         </div>
       </div>
     </Card>
@@ -38,33 +54,46 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import Card from '@/components/ui/Card.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import { api } from '@/utils/api'
+import { useToast } from '@/composables/useToast'
 
-const template = ref('')
+const toast = useToast()
+
+const tabs = [
+  { key: 'default', label: 'پیش‌فرض' },
+  { key: 'telegram', label: 'تلگرام' },
+  { key: 'bale', label: 'بله' },
+] as const
+
+type TabKey = (typeof tabs)[number]['key']
+
+const activeTab = ref<TabKey>('default')
+const templates = reactive<Record<TabKey, string>>({ default: '', telegram: '', bale: '' })
 const variables = ref<Record<string, string>>({})
 const preview = ref('')
 const saving = ref(false)
 const previewing = ref(false)
 const copiedVariable = ref('')
 
+const charCount = computed(() => templates[activeTab.value]?.length ?? 0)
+
 onMounted(async () => {
-  const [templateRes, variablesRes] = await Promise.all([
-    api.get('/templates'),
-    api.get('/templates/variables'),
-  ])
-  template.value = templateRes.data.template
-  variables.value = variablesRes.data.variables
+  const { data } = await api.get('/templates')
+  templates.default = data.default ?? ''
+  templates.telegram = data.telegram ?? ''
+  templates.bale = data.bale ?? ''
+  variables.value = data.variables ?? {}
   await handlePreview()
 })
 
 async function handlePreview() {
   previewing.value = true
   try {
-    const { data } = await api.post('/templates/preview', { template: template.value })
+    const { data } = await api.post('/templates/preview', { template: templates[activeTab.value] || templates.default })
     preview.value = data.preview
   } finally {
     previewing.value = false
@@ -74,7 +103,8 @@ async function handlePreview() {
 async function handleSave() {
   saving.value = true
   try {
-    await api.post('/templates', { template: template.value })
+    await api.post('/templates', { ...templates })
+    toast.success('قالب‌ها ذخیره شدند.')
     await handlePreview()
   } finally {
     saving.value = false
