@@ -95,6 +95,24 @@ class BotPress_REST_API {
             ],
         ]);
 
+        register_rest_route($this->namespace, '/templates/variables', [
+            'methods'             => 'GET',
+            'callback'            => [$this, 'get_template_variables'],
+            'permission_callback' => [$this, 'check_permission'],
+        ]);
+
+        register_rest_route($this->namespace, '/templates/preview', [
+            'methods'             => 'POST',
+            'callback'            => [$this, 'preview_template'],
+            'permission_callback' => [$this, 'check_permission'],
+        ]);
+
+        register_rest_route($this->namespace, '/posts/(?P<id>\d+)/publish', [
+            'methods'             => 'POST',
+            'callback'            => [$this, 'publish_post'],
+            'permission_callback' => [$this, 'check_permission'],
+        ]);
+
         register_rest_route($this->namespace, '/webhook/set', [
             'methods'             => 'POST',
             'callback'            => [$this, 'set_webhook'],
@@ -312,9 +330,46 @@ class BotPress_REST_API {
 
     public function get_logs(WP_REST_Request $request): WP_REST_Response {
         global $wpdb;
-        $logs = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}botpress_logs ORDER BY id DESC LIMIT 100");
-        $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}botpress_logs");
-        return new WP_REST_Response(['logs' => $logs, 'total' => $total], 200);
+
+        $where = [];
+        $values = [];
+
+        $platform = (string) $request->get_param('platform');
+        if ($platform !== '') {
+            $where[] = 'platform = %s';
+            $values[] = $platform;
+        }
+
+        $status = (string) $request->get_param('status');
+        if ($status !== '') {
+            $where[] = 'status = %s';
+            $values[] = $status;
+        }
+
+        $action = (string) $request->get_param('action');
+        if ($action !== '') {
+            $where[] = 'action = %s';
+            $values[] = $action;
+        }
+
+        $where_sql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
+        $per_page = max(1, min(100, (int) ($request->get_param('per_page') ?: 20)));
+        $page = max(1, (int) ($request->get_param('page') ?: 1));
+        $offset = ($page - 1) * $per_page;
+
+        $logs_sql = "SELECT * FROM {$wpdb->prefix}botpress_logs {$where_sql} ORDER BY id DESC LIMIT %d OFFSET %d";
+        $count_sql = "SELECT COUNT(*) FROM {$wpdb->prefix}botpress_logs {$where_sql}";
+
+        $logs = $wpdb->get_results($wpdb->prepare($logs_sql, array_merge($values, [$per_page, $offset])));
+        $total = (int) $wpdb->get_var($values ? $wpdb->prepare($count_sql, $values) : $count_sql);
+
+        return new WP_REST_Response([
+            'logs'     => $logs,
+            'total'    => $total,
+            'page'     => $page,
+            'per_page' => $per_page,
+        ], 200);
     }
 
     public function clear_logs(WP_REST_Request $request): WP_REST_Response {
@@ -359,6 +414,30 @@ class BotPress_REST_API {
         $template = (string) $request->get_param('template');
         update_option('botpress_default_template', wp_kses_post($template));
         return new WP_REST_Response(['success' => true], 200);
+    }
+
+    public function get_template_variables(WP_REST_Request $request): WP_REST_Response {
+        return new WP_REST_Response(['variables' => BotPress_Template_Engine::available_variables()], 200);
+    }
+
+    public function preview_template(WP_REST_Request $request): WP_REST_Response {
+        $template = (string) $request->get_param('template');
+        return new WP_REST_Response(['preview' => BotPress_Template_Engine::preview($template)], 200);
+    }
+
+    public function publish_post(WP_REST_Request $request): WP_REST_Response {
+        $post_id = (int) $request->get_param('id');
+        $target = (string) ($request->get_param('target') ?: 'both');
+        $channel_id = $request->get_param('channel_id');
+        $channel_id = $channel_id ? (int) $channel_id : null;
+
+        if (!in_array($target, ['wordpress', 'channel', 'both'], true)) {
+            return new WP_REST_Response(['success' => false, 'message' => 'invalid_target'], 400);
+        }
+
+        $result = (new BotPress_Publisher_Engine())->publish_now($post_id, $target, $channel_id);
+
+        return new WP_REST_Response($result, $result['success'] ? 200 : 400);
     }
 
     public function set_webhook(WP_REST_Request $request): WP_REST_Response {
