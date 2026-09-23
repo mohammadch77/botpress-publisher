@@ -33,10 +33,14 @@ export interface LogEntry {
 export interface QueueItem {
   id: number
   post_id: number
+  post_title?: string | null
   channel_id: number | null
   publish_target: 'wordpress' | 'channel' | 'both'
   status: 'pending' | 'processing' | 'published' | 'failed'
   scheduled_at: string
+  published_at?: string | null
+  attempts: number
+  last_error?: string | null
 }
 
 export interface PlatformSettings {

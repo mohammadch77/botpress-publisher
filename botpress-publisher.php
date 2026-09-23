@@ -44,6 +44,7 @@ require_once BOTPRESS_PATH . 'includes/bot/commands/class-cancel-command.php';
 require_once BOTPRESS_PATH . 'includes/publisher/class-publisher-engine.php';
 require_once BOTPRESS_PATH . 'includes/publisher/class-wordpress-publisher.php';
 require_once BOTPRESS_PATH . 'includes/publisher/class-channel-publisher.php';
+require_once BOTPRESS_PATH . 'includes/scheduler/class-queue-manager.php';
 require_once BOTPRESS_PATH . 'includes/scheduler/class-cron-scheduler.php';
 
 register_activation_hook(__FILE__, ['BotPress_Activator', 'activate']);

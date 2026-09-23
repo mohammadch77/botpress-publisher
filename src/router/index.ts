@@ -31,6 +31,12 @@ const routes = [
     component: () => import('@/pages/Logs.vue'),
     meta: { title: 'Logs' },
   },
+  {
+    path: '/queue',
+    name: 'queue',
+    component: () => import('@/pages/Queue.vue'),
+    meta: { title: 'Queue' },
+  },
 ]
 
 export const router = createRouter({

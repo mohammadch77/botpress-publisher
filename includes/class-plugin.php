@@ -19,6 +19,7 @@ class BotPress_Plugin {
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
         add_action('rest_api_init', [$this, 'register_api']);
         add_filter('cron_schedules', [$this, 'add_cron_schedules']);
+        BotPress_Cron_Scheduler::register();
     }
 
     public function add_cron_schedules(array $schedules): array {

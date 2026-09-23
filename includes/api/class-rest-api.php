@@ -71,8 +71,21 @@ class BotPress_REST_API {
         ]);
 
         register_rest_route($this->namespace, '/queue', [
-            'methods'             => 'GET',
-            'callback'            => [$this, 'get_queue'],
+            [
+                'methods'             => 'GET',
+                'callback'            => [$this, 'get_queue'],
+                'permission_callback' => [$this, 'check_permission'],
+            ],
+            [
+                'methods'             => 'POST',
+                'callback'            => [$this, 'add_to_queue'],
+                'permission_callback' => [$this, 'check_permission'],
+            ],
+        ]);
+
+        register_rest_route($this->namespace, '/queue/(?P<id>\d+)', [
+            'methods'             => 'DELETE',
+            'callback'            => [$this, 'cancel_queue_item'],
             'permission_callback' => [$this, 'check_permission'],
         ]);
 
@@ -380,8 +393,57 @@ class BotPress_REST_API {
 
     public function get_queue(WP_REST_Request $request): WP_REST_Response {
         global $wpdb;
-        $queue = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}botpress_publish_queue ORDER BY id DESC LIMIT 100");
-        return new WP_REST_Response(['queue' => $queue], 200);
+
+        $items = $wpdb->get_results(
+            "SELECT q.*, p.post_title
+             FROM {$wpdb->prefix}botpress_publish_queue q
+             LEFT JOIN {$wpdb->prefix}posts p ON p.ID = q.post_id
+             ORDER BY q.scheduled_at DESC
+             LIMIT 100"
+        );
+        $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}botpress_publish_queue");
+
+        return new WP_REST_Response(['items' => $items, 'total' => $total], 200);
+    }
+
+    public function add_to_queue(WP_REST_Request $request): WP_REST_Response {
+        $post_id = (int) $request->get_param('post_id');
+        $scheduled_at = (string) $request->get_param('scheduled_at');
+        $target = (string) ($request->get_param('target') ?: 'both');
+        $channel_id = $request->get_param('channel_id');
+        $channel_id = $channel_id ? (int) $channel_id : null;
+
+        if (!$post_id || !get_post($post_id)) {
+            return new WP_REST_Response(['success' => false, 'message' => 'post_not_found'], 404);
+        }
+
+        $timestamp = strtotime($scheduled_at);
+        if (!$timestamp) {
+            return new WP_REST_Response(['success' => false, 'message' => 'invalid_scheduled_at'], 400);
+        }
+
+        if (!in_array($target, ['wordpress', 'channel', 'both'], true)) {
+            return new WP_REST_Response(['success' => false, 'message' => 'invalid_target'], 400);
+        }
+
+        $queue_id = (new BotPress_Queue_Manager())->add(
+            $post_id,
+            date('Y-m-d H:i:s', $timestamp),
+            $target,
+            $channel_id
+        );
+
+        if (!$queue_id) {
+            return new WP_REST_Response(['success' => false, 'message' => 'queue_insert_failed'], 500);
+        }
+
+        return new WP_REST_Response(['success' => true, 'id' => $queue_id], 200);
+    }
+
+    public function cancel_queue_item(WP_REST_Request $request): WP_REST_Response {
+        $id = (int) $request->get_param('id');
+        $success = (new BotPress_Queue_Manager())->cancel($id);
+        return new WP_REST_Response(['success' => $success], $success ? 200 : 400);
     }
 
     public function get_posts(WP_REST_Request $request): WP_REST_Response {

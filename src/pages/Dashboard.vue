@@ -3,7 +3,14 @@
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard label="Total Channels" :value="stats.total_channels" :icon="Radio" :loading="loading" />
       <StatCard label="Published Today" :value="stats.published_today" :icon="Send" :loading="loading" />
-      <StatCard label="Pending in Queue" :value="stats.pending_in_queue" :icon="Clock" :loading="loading" />
+      <StatCard
+        label="Pending in Queue"
+        :value="stats.pending_in_queue"
+        :icon="Clock"
+        :loading="loading"
+        class="cursor-pointer transition hover:border-brand-300 hover:shadow-md"
+        @click="router.push('/queue')"
+      />
       <StatCard label="Failed Today" :value="stats.failed_today" :icon="AlertTriangle" :loading="loading" />
     </div>
 
@@ -38,6 +45,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Radio, Send, Clock, AlertTriangle } from 'lucide-vue-next'
 import StatCard from '@/components/ui/StatCard.vue'
 import Card from '@/components/ui/Card.vue'
@@ -48,6 +56,7 @@ import Input from '@/components/ui/Input.vue'
 import { api } from '@/utils/api'
 import type { DashboardStats } from '@/types'
 
+const router = useRouter()
 const loading = ref(true)
 const stats = reactive<DashboardStats>({
   total_channels: 0,

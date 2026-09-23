@@ -66,6 +66,7 @@ import {
   Share2,
   ChevronsLeft,
   ChevronsRight,
+  Clock,
 } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
@@ -82,6 +83,7 @@ const navItems = [
   { path: '/bot-settings', label: 'Bot Settings', icon: Bot },
   { path: '/templates', label: 'Templates', icon: FileText },
   { path: '/logs', label: 'Logs', icon: ScrollText },
+  { path: '/queue', label: 'صف انتشار', icon: Clock },
 ]
 
 watch(
