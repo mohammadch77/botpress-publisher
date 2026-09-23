@@ -11,6 +11,8 @@ class ConversationHistory extends Model
 {
     use BelongsToTenant;
 
+    protected $table = 'conversation_history';
+
     public $timestamps = false;
 
     protected $fillable = [

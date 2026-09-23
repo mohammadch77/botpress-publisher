@@ -6,7 +6,7 @@ use App\Services\Admin\BotService;
 use App\Services\Tenant\TenantContext;
 
 beforeEach(function () {
-    $this->service = new BotService();
+    $this->service = new BotService;
     $this->tenant = Tenant::factory()->create();
     app(TenantContext::class)->set($this->tenant);
 });

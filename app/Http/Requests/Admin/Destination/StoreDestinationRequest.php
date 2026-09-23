@@ -2,13 +2,14 @@
 
 namespace App\Http\Requests\Admin\Destination;
 
+use App\Models\Destination;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreDestinationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('create', \App\Models\Destination::class) ?? false;
+        return $this->user()?->can('create', Destination::class) ?? false;
     }
 
     public function rules(): array

@@ -2,13 +2,14 @@
 
 namespace App\Http\Requests\Admin\Bot;
 
+use App\Models\Bot;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreBotRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('create', \App\Models\Bot::class) ?? false;
+        return $this->user()?->can('create', Bot::class) ?? false;
     }
 
     public function rules(): array

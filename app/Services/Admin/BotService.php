@@ -2,7 +2,9 @@
 
 namespace App\Services\Admin;
 
+use App\Enums\BotStatus;
 use App\Models\Bot;
+use App\Services\Bot\BotDriverFactory;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Crypt;
 
@@ -69,11 +71,27 @@ class BotService
 
     public function testConnection(Bot $bot): array
     {
-        // Real Telegram/Bale connectivity checks are out of scope for Phase 1.
-        return [
-            'connected' => false,
-            'message' => 'Not implemented yet',
-        ];
+        try {
+            $driver = app(BotDriverFactory::class)->make($bot);
+            $info = $driver->getMe();
+
+            $bot->update([
+                'status' => BotStatus::Active,
+                'username' => $info->username,
+                'metadata' => ['id' => $info->id, 'username' => $info->username],
+                'last_error' => null,
+            ]);
+
+            return ['connected' => true, 'username' => $info->username];
+        } catch (\Throwable $e) {
+            $bot->update([
+                'status' => BotStatus::Error,
+                'last_error' => $e->getMessage(),
+                'last_error_at' => now(),
+            ]);
+
+            return ['connected' => false, 'error' => 'Connection failed'];
+        }
     }
 
     public function encryptToken(string $token): string
