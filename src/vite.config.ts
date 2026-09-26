@@ -19,7 +19,9 @@ export default defineConfig({
                 assetFileNames: (info) => {
                     if (info.name?.endsWith('.css')) return 'index.css'
                     return 'assets/[name]-[hash][extname]'
-                }
+                },
+                manualChunks: undefined,
+                inlineDynamicImports: true,
             }
         }
     },

@@ -43,6 +43,13 @@ class BotPress_Plugin {
     }
 
     public function render_admin(): void {
+        $data = [
+            'apiUrl'  => rest_url('botpress/v1'),
+            'nonce'   => wp_create_nonce('wp_rest'),
+            'siteUrl' => get_site_url(),
+            'version' => BOTPRESS_VERSION,
+        ];
+        echo '<script>window.botpressData = ' . wp_json_encode($data) . ';</script>';
         echo '<div id="botpress-app"></div>';
     }
 
@@ -51,7 +58,7 @@ class BotPress_Plugin {
             return;
         }
 
-        $js_path = BOTPRESS_PATH . 'admin/index.js';
+        $js_path  = BOTPRESS_PATH . 'admin/index.js';
         $css_path = BOTPRESS_PATH . 'admin/index.css';
 
         if (file_exists($js_path)) {
@@ -62,6 +69,13 @@ class BotPress_Plugin {
                 (string) filemtime($js_path),
                 true
             );
+
+            add_filter('script_loader_tag', function(string $tag, string $handle): string {
+                if ('botpress-app' === $handle) {
+                    return str_replace('<script ', '<script type="module" ', $tag);
+                }
+                return $tag;
+            }, 10, 2);
         }
 
         if (file_exists($css_path)) {
@@ -72,13 +86,6 @@ class BotPress_Plugin {
                 (string) filemtime($css_path)
             );
         }
-
-        wp_localize_script('botpress-app', 'botpressData', [
-            'apiUrl'  => rest_url('botpress/v1'),
-            'nonce'   => wp_create_nonce('wp_rest'),
-            'siteUrl' => get_site_url(),
-            'version' => BOTPRESS_VERSION,
-        ]);
     }
 
     public function register_api(): void {
