@@ -32,7 +32,14 @@ class BotPress_Search_Command extends BotPress_Base_Command {
         $buttons = [];
         $i = 1;
         foreach ($posts as $post) {
-            $status = $post->post_status === 'publish' ? 'published' : $post->post_status;
+            $status_map = [
+                'publish' => 'منتشر شده',
+                'draft'   => 'پیش‌نویس',
+                'pending' => 'در انتظار بررسی',
+                'future'  => 'زمان‌بندی شده',
+                'private' => 'خصوصی',
+            ];
+            $status = $status_map[$post->post_status] ?? $post->post_status;
             $text .= "{$i}. " . esc_html($post->post_title) . " — <i>{$status}</i>\n";
             $buttons[] = [[
                 'text'          => "{$i}. جزئیات 🔍",
