@@ -6,12 +6,31 @@ class BotPress_Queue_Manager {
     public function add(int $post_id, string $scheduled_at, string $target = 'both', ?int $channel_id = null) {
         global $wpdb;
 
-        $existing = $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM {$wpdb->prefix}botpress_publish_queue
-             WHERE post_id = %d AND status = 'pending'
-             LIMIT 1",
-            $post_id
-        ));
+        if (!get_post($post_id)) {
+            return false;
+        }
+
+        $timestamp = strtotime($scheduled_at);
+        if (!$timestamp || $timestamp < time()) {
+            return false;
+        }
+
+        if ($channel_id !== null) {
+            $existing = $wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM {$wpdb->prefix}botpress_publish_queue
+                 WHERE post_id = %d AND channel_id = %d AND status = 'pending'
+                 LIMIT 1",
+                $post_id,
+                $channel_id
+            ));
+        } else {
+            $existing = $wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM {$wpdb->prefix}botpress_publish_queue
+                 WHERE post_id = %d AND channel_id IS NULL AND status = 'pending'
+                 LIMIT 1",
+                $post_id
+            ));
+        }
 
         if ($existing) {
             return (int) $existing;
@@ -124,6 +143,20 @@ class BotPress_Queue_Manager {
             [
                 'status'       => 'published',
                 'published_at' => current_time('mysql'),
+                'updated_at'   => current_time('mysql'),
+            ],
+            ['id' => $id]
+        );
+    }
+
+    public function reschedule(int $id, int $delay_seconds): void {
+        global $wpdb;
+        $wpdb->update(
+            $wpdb->prefix . 'botpress_publish_queue',
+            [
+                'status'       => 'pending',
+                'scheduled_at' => date('Y-m-d H:i:s', time() + max(1, $delay_seconds)),
+                'last_error'   => 'محدودیت نرخ ارسال؛ تلاش مجدد زمان‌بندی شد',
                 'updated_at'   => current_time('mysql'),
             ],
             ['id' => $id]

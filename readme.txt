@@ -16,6 +16,15 @@ BotPress Publisher lets you manage Telegram and Bale bot channels directly from
 WordPress, queue posts for publishing, and control everything from a modern
 Vue-based admin dashboard.
 
+== Features ==
+
+* Connect multiple Telegram and Bale bot channels.
+* Publish posts to WordPress and/or connected channels, immediately or on a schedule.
+* Bot commands: /posts, /search, /publish, /schedule, /cancel, /pending, /channels, /status, /help, /post_detail.
+* Per-platform message templates with live preview.
+* Publishing queue with retry, cancellation, and activity logs.
+* Rate limiting, request validation, and encrypted bot token storage for production use.
+
 == Installation ==
 
 1. Upload the plugin files to the `/wp-content/plugins/botpress-publisher` directory.
@@ -25,4 +34,5 @@ Vue-based admin dashboard.
 == Changelog ==
 
 = 1.0.0 =
+* Security hardening pass: REST API input validation, nonce verification, rate limiting on the bot webhook, webhook idempotency and payload size limits, output sanitization, centralized error logging, plugin activation requirement checks, and a complete uninstall routine.
 * Initial plugin foundation: database schema, REST API stubs, admin UI shell.

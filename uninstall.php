@@ -18,8 +18,11 @@ $options = [
     'botpress_bot_token_telegram_enc',
     'botpress_bot_token_bale_enc',
     'botpress_webhook_secret',
+    'botpress_webhook_set_telegram',
+    'botpress_webhook_set_bale',
     'botpress_authorized_users',
     'botpress_default_template',
+    'botpress_templates',
     'botpress_notify_on_publish',
     'botpress_notify_on_fail',
 ];
@@ -29,3 +32,9 @@ foreach ($options as $option) {
 }
 
 wp_clear_scheduled_hook('botpress_process_queue');
+
+$wpdb->query(
+    "DELETE FROM {$wpdb->options}
+     WHERE option_name LIKE '\\_transient\\_botpress\\_%'
+        OR option_name LIKE '\\_transient\\_timeout\\_botpress\\_%'"
+);

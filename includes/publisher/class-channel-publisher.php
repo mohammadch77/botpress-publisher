@@ -54,6 +54,8 @@ class BotPress_Channel_Publisher {
 
         $success = $result['ok'] ?? false;
         $error = $success ? null : ($result['description'] ?? 'خطای ناشناخته');
+        $is_rate_limited = !$success && (int) ($result['error_code'] ?? 0) === 429;
+        $retry_after = $is_rate_limited ? (int) ($result['parameters']['retry_after'] ?? 30) : null;
 
         if ($success) {
             $wpdb->update(
@@ -70,12 +72,14 @@ class BotPress_Channel_Publisher {
         }
 
         return [
-            'channel_id'   => (int) $channel->id,
-            'channel_name' => $channel->name,
-            'platform'     => $channel->platform,
-            'success'      => $success,
-            'message_id'   => $result['result']['message_id'] ?? null,
-            'error'        => $error,
+            'channel_id'      => (int) $channel->id,
+            'channel_name'    => $channel->name,
+            'platform'        => $channel->platform,
+            'success'         => $success,
+            'message_id'      => $result['result']['message_id'] ?? null,
+            'error'           => $error,
+            'rate_limited'    => $is_rate_limited,
+            'retry_after'     => $retry_after,
         ];
     }
 }

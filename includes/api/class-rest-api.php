@@ -22,6 +22,7 @@ class BotPress_REST_API {
                 'methods'             => 'POST',
                 'callback'            => [$this, 'create_channel'],
                 'permission_callback' => [$this, 'check_permission'],
+                'args'                => $this->channel_args(),
             ],
         ]);
 
@@ -30,11 +31,13 @@ class BotPress_REST_API {
                 'methods'             => 'PUT',
                 'callback'            => [$this, 'update_channel'],
                 'permission_callback' => [$this, 'check_permission'],
+                'args'                => $this->channel_id_arg() + $this->channel_args(false),
             ],
             [
                 'methods'             => 'DELETE',
                 'callback'            => [$this, 'delete_channel'],
                 'permission_callback' => [$this, 'check_permission'],
+                'args'                => $this->channel_id_arg(),
             ],
         ]);
 
@@ -42,6 +45,7 @@ class BotPress_REST_API {
             'methods'             => 'POST',
             'callback'            => [$this, 'test_channel'],
             'permission_callback' => [$this, 'check_permission'],
+            'args'                => $this->channel_id_arg(),
         ]);
 
         register_rest_route($this->namespace, '/settings', [
@@ -54,6 +58,34 @@ class BotPress_REST_API {
                 'methods'             => 'POST',
                 'callback'            => [$this, 'save_settings'],
                 'permission_callback' => [$this, 'check_permission'],
+                'args'                => [
+                    'telegram_token' => [
+                        'type'              => 'string',
+                        'required'          => false,
+                        'validate_callback' => static fn($v) => $v === '' || $v === null || strlen((string) $v) >= 20,
+                    ],
+                    'bale_token' => [
+                        'type'              => 'string',
+                        'required'          => false,
+                        'validate_callback' => static fn($v) => $v === '' || $v === null || strlen((string) $v) >= 20,
+                    ],
+                    'authorized_users' => [
+                        'required'          => false,
+                        'validate_callback' => static function ($v) {
+                            if (!is_array($v)) {
+                                return false;
+                            }
+                            foreach ($v as $id) {
+                                if (!preg_match('/^-?\d+$/', (string) $id)) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        },
+                    ],
+                    'notify_on_publish' => ['required' => false],
+                    'notify_on_fail'    => ['required' => false],
+                ],
             ],
         ]);
 
@@ -86,6 +118,30 @@ class BotPress_REST_API {
                 'methods'             => 'POST',
                 'callback'            => [$this, 'add_to_queue'],
                 'permission_callback' => [$this, 'check_permission'],
+                'args'                => [
+                    'post_id' => [
+                        'type'              => 'integer',
+                        'required'          => true,
+                        'validate_callback' => static fn($v) => (bool) get_post((int) $v),
+                    ],
+                    'scheduled_at' => [
+                        'type'              => 'string',
+                        'required'          => true,
+                        'validate_callback' => static function ($v) {
+                            $ts = strtotime((string) $v);
+                            return $ts !== false && $ts > time();
+                        },
+                    ],
+                    'target' => [
+                        'type'              => 'string',
+                        'required'          => false,
+                        'validate_callback' => static fn($v) => in_array($v, ['wordpress', 'channel', 'both'], true),
+                    ],
+                    'channel_id' => [
+                        'required' => false,
+                        'validate_callback' => static fn($v) => $v === null || $v === '' || (int) $v > 0,
+                    ],
+                ],
             ],
         ]);
 
@@ -93,12 +149,18 @@ class BotPress_REST_API {
             'methods'             => 'DELETE',
             'callback'            => [$this, 'cancel_queue_item'],
             'permission_callback' => [$this, 'check_permission'],
+            'args'                => [
+                'id' => ['type' => 'integer', 'required' => true, 'validate_callback' => static fn($v) => (int) $v > 0],
+            ],
         ]);
 
         register_rest_route($this->namespace, '/queue/(?P<id>\d+)/retry', [
             'methods'             => 'POST',
             'callback'            => [$this, 'retry_queue_item'],
             'permission_callback' => [$this, 'check_permission'],
+            'args'                => [
+                'id' => ['type' => 'integer', 'required' => true, 'validate_callback' => static fn($v) => (int) $v > 0],
+            ],
         ]);
 
         register_rest_route($this->namespace, '/posts', [
@@ -117,6 +179,11 @@ class BotPress_REST_API {
                 'methods'             => 'POST',
                 'callback'            => [$this, 'save_template'],
                 'permission_callback' => [$this, 'check_permission'],
+                'args'                => [
+                    'default'  => ['type' => 'string', 'required' => false, 'validate_callback' => [$this, 'validate_template_string']],
+                    'telegram' => ['type' => 'string', 'required' => false, 'validate_callback' => [$this, 'validate_template_string']],
+                    'bale'     => ['type' => 'string', 'required' => false, 'validate_callback' => [$this, 'validate_template_string']],
+                ],
             ],
         ]);
 
@@ -136,6 +203,22 @@ class BotPress_REST_API {
             'methods'             => 'POST',
             'callback'            => [$this, 'publish_post'],
             'permission_callback' => [$this, 'check_permission'],
+            'args'                => [
+                'id' => [
+                    'type'              => 'integer',
+                    'required'          => true,
+                    'validate_callback' => static fn($v) => (bool) get_post((int) $v),
+                ],
+                'target' => [
+                    'type'              => 'string',
+                    'required'          => false,
+                    'validate_callback' => static fn($v) => in_array($v, ['wordpress', 'channel', 'both'], true),
+                ],
+                'channel_id' => [
+                    'required'          => false,
+                    'validate_callback' => static fn($v) => $v === null || $v === '' || (int) $v > 0,
+                ],
+            ],
         ]);
 
         register_rest_route($this->namespace, '/settings/test-bot', [
@@ -164,8 +247,75 @@ class BotPress_REST_API {
         ]);
     }
 
-    public function check_permission(): bool {
-        return current_user_can('manage_options');
+    public function check_permission(?WP_REST_Request $request = null): bool {
+        if (!is_user_logged_in() || !current_user_can('manage_options')) {
+            return false;
+        }
+
+        if ($request instanceof WP_REST_Request && in_array($request->get_method(), ['POST', 'PUT', 'DELETE', 'PATCH'], true)) {
+            $nonce = $request->get_header('X-WP-Nonce');
+            if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function channel_id_arg(): array {
+        return [
+            'id' => [
+                'type'              => 'integer',
+                'required'          => true,
+                'validate_callback' => static function ($v) {
+                    global $wpdb;
+                    $exists = $wpdb->get_var($wpdb->prepare(
+                        "SELECT id FROM {$wpdb->prefix}botpress_channels WHERE id = %d", (int) $v
+                    ));
+                    return (bool) $exists;
+                },
+            ],
+        ];
+    }
+
+    private function channel_args(bool $required = true): array {
+        return [
+            'name' => [
+                'type'              => 'string',
+                'required'          => $required,
+                'sanitize_callback' => 'sanitize_text_field',
+                'validate_callback' => static fn($v) => $v === null || (strlen((string) $v) > 0 && strlen((string) $v) <= 191),
+            ],
+            'platform' => [
+                'type'              => 'string',
+                'required'          => $required,
+                'validate_callback' => static fn($v) => $v === null || in_array($v, ['telegram', 'bale'], true),
+            ],
+            'chat_id' => [
+                'type'              => 'string',
+                'required'          => $required,
+                'validate_callback' => static fn($v) => $v === null || (bool) preg_match('/^-?\d+$/', (string) $v),
+            ],
+            'bot_token' => [
+                'type'              => 'string',
+                'required'          => $required,
+                'validate_callback' => static fn($v) => $v === null || $v === '' || strlen((string) $v) >= 20,
+            ],
+            'is_active' => [
+                'required' => false,
+            ],
+        ];
+    }
+
+    public function validate_template_string($value): bool {
+        $value = (string) $value;
+        if (strlen($value) > 4096) {
+            return false;
+        }
+        if (preg_match('/<script\b/i', $value)) {
+            return false;
+        }
+        return true;
     }
 
     public function handle_telegram_webhook(WP_REST_Request $request): void {
@@ -217,6 +367,8 @@ class BotPress_REST_API {
 
         foreach ($channels as $channel) {
             $channel->is_active = (bool) $channel->is_active;
+            $channel->name = esc_html($channel->name);
+            $channel->last_error = $channel->last_error !== null ? esc_html($channel->last_error) : null;
         }
 
         return new WP_REST_Response(['channels' => $channels], 200);
@@ -508,6 +660,15 @@ class BotPress_REST_API {
              LIMIT 100"
         );
         $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}botpress_publish_queue");
+
+        foreach ($items as $item) {
+            if (isset($item->post_title)) {
+                $item->post_title = esc_html($item->post_title);
+            }
+            if (isset($item->last_error) && $item->last_error !== null) {
+                $item->last_error = esc_html($item->last_error);
+            }
+        }
 
         return new WP_REST_Response(['items' => $items, 'total' => $total], 200);
     }

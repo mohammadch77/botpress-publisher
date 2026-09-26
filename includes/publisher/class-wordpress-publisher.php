@@ -29,6 +29,10 @@ class BotPress_WordPress_Publisher {
             return ['success' => false, 'error' => $result->get_error_message()];
         }
 
+        if (empty($result)) {
+            return ['success' => false, 'error' => 'بروزرسانی مقاله ناموفق بود'];
+        }
+
         return [
             'success'           => true,
             'url'               => get_permalink($post_id),

@@ -4,9 +4,40 @@ defined('ABSPATH') || exit;
 
 class BotPress_Activator {
     public static function activate(): void {
+        self::check_requirements();
         self::create_tables();
         self::set_default_options();
         self::schedule_cron();
+        flush_rewrite_rules();
+    }
+
+    private static function check_requirements(): void {
+        global $wp_version;
+
+        $errors = [];
+
+        if (version_compare(PHP_VERSION, '7.4', '<')) {
+            $errors[] = 'نسخه PHP شما (' . PHP_VERSION . ') قدیمی است. حداقل نسخه مورد نیاز PHP 7.4 است.';
+        }
+
+        if (!empty($wp_version) && version_compare($wp_version, '5.8', '<')) {
+            $errors[] = 'نسخه وردپرس شما (' . $wp_version . ') قدیمی است. حداقل نسخه مورد نیاز وردپرس 5.8 است.';
+        }
+
+        foreach (['openssl', 'json', 'mbstring'] as $extension) {
+            if (!extension_loaded($extension)) {
+                $errors[] = "افزونه PHP «{$extension}» بارگذاری نشده و برای اجرای این افزونه ضروری است.";
+            }
+        }
+
+        if (!empty($errors)) {
+            deactivate_plugins(plugin_basename(BOTPRESS_FILE));
+            wp_die(
+                '<p>' . implode('</p><p>', $errors) . '</p>',
+                'خطا در فعال‌سازی افزونه BotPress Publisher',
+                ['back_link' => true]
+            );
+        }
     }
 
     private static function create_tables(): void {

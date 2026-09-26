@@ -13,8 +13,8 @@ class BotPress_Publisher_Engine {
 
     public function publish_now(int $post_id, string $target = 'both', ?int $channel_id = null): array {
         $post = get_post($post_id);
-        if (!$post) {
-            return ['success' => false, 'error' => 'مقاله یافت نشد'];
+        if (!$post || get_post_status($post_id) === 'trash') {
+            return ['success' => false, 'error' => 'مقاله یافت نشد یا حذف شده است'];
         }
 
         $wp_result = null;
@@ -83,15 +83,6 @@ class BotPress_Publisher_Engine {
         string $message,
         ?string $platform
     ): void {
-        global $wpdb;
-        $wpdb->insert($wpdb->prefix . 'botpress_logs', [
-            'post_id'    => $post_id,
-            'channel_id' => $channel_id,
-            'action'     => $action,
-            'platform'   => $platform,
-            'status'     => $status,
-            'message'    => $message,
-            'created_at' => current_time('mysql'),
-        ]);
+        BotPress_Error_Handler::log_to_db($post_id, $channel_id, $action, $status, $message, $platform);
     }
 }

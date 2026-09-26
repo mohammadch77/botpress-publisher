@@ -21,4 +21,13 @@ abstract class BotPress_Base_Command {
     protected function format_date(string $date): string {
         return wp_date('Y/m/d H:i', strtotime($date));
     }
+
+    protected function safe_html(string $text): string {
+        return wp_kses($text, [
+            'b'    => [],
+            'i'    => [],
+            'code' => [],
+            'a'    => ['href' => true],
+        ]);
+    }
 }

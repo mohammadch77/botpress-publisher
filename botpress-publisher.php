@@ -18,6 +18,7 @@ define('BOTPRESS_URL', plugin_dir_url(__FILE__));
 define('BOTPRESS_ADMIN_URL', BOTPRESS_URL . 'admin/');
 
 require_once BOTPRESS_PATH . 'includes/class-plugin.php';
+require_once BOTPRESS_PATH . 'includes/class-error-handler.php';
 require_once BOTPRESS_PATH . 'includes/class-activator.php';
 require_once BOTPRESS_PATH . 'includes/class-deactivator.php';
 require_once BOTPRESS_PATH . 'includes/helpers/class-encryption.php';
