@@ -14,7 +14,7 @@ class BotPress_Channels_Command extends BotPress_Base_Command {
             return $this->reply($context, '📢 هیچ کانالی تنظیم نشده است.');
         }
 
-        $text = "📢 <b>کانال‌های متصل</b>\n\n";
+        $text = "📢 کانال‌های متصل\n\n";
         foreach ($channels as $channel) {
             $status_icon = $channel->is_active ? '✅' : '❌';
             $text .= "• " . esc_html($channel->name) . " ({$channel->platform}) — {$channel->chat_id} {$status_icon}\n";

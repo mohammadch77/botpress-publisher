@@ -28,7 +28,7 @@ class BotPress_Search_Command extends BotPress_Base_Command {
             return $driver->send_message($chat_id, $text);
         }
 
-        $text = '🔎 <b>نتایج جستجو برای «' . esc_html($query) . '»</b> (' . count($posts) . ")\n\n";
+        $text = '🔎 نتایج جستجو برای «' . esc_html($query) . '» (' . count($posts) . ")\n\n";
         $buttons = [];
         $i = 1;
         foreach ($posts as $post) {
@@ -40,7 +40,7 @@ class BotPress_Search_Command extends BotPress_Base_Command {
                 'private' => 'خصوصی',
             ];
             $status = $status_map[$post->post_status] ?? $post->post_status;
-            $text .= "{$i}. " . esc_html($post->post_title) . " — <i>{$status}</i>\n";
+            $text .= "{$i}. " . esc_html($post->post_title) . " — {$status}\n";
             $buttons[] = [[
                 'text'          => "{$i}. جزئیات 🔍",
                 'callback_data' => 'post_detail:' . $post->ID,

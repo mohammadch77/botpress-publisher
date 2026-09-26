@@ -26,7 +26,7 @@ class BotPress_Status_Command extends BotPress_Base_Command {
             "SELECT name, platform, is_active FROM {$wpdb->prefix}botpress_channels ORDER BY id DESC"
         );
 
-        $text = "📊 <b>وضعیت سیستم</b>\n\n"
+        $text = "📊 وضعیت سیستم\n\n"
             . "🌐 سایت: " . esc_html(get_site_url()) . "\n"
             . "📝 کل مقالات: {$total_posts}\n"
             . "📅 در صف: {$pending}\n"

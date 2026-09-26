@@ -9,9 +9,9 @@ class BotPress_Schedule_Command extends BotPress_Base_Command {
         if (!$post_id) {
             return $this->reply(
                 $context,
-                "📅 <b>زمان‌بندی انتشار</b>\n\n" .
-                "استفاده: <code>/schedule [شناسه مقاله]</code>\n\n" .
-                "مثال: <code>/schedule 42</code>\n\n" .
+                "📅 زمان‌بندی انتشار\n\n" .
+                "استفاده: /schedule [شناسه مقاله]\n\n" .
+                "مثال: /schedule 42\n\n" .
                 "یا از /posts لیست مقالات را ببینید."
             );
         }
@@ -21,14 +21,14 @@ class BotPress_Schedule_Command extends BotPress_Base_Command {
             $custom = $context['args'][1] . ' ' . $context['args'][2];
             $timestamp = strtotime($custom);
             if ($timestamp === false) {
-                return $this->reply($context, "❌ فرمت زمان نامعتبر است. مثال: <code>2024-12-25 09:00</code>");
+                return $this->reply($context, "❌ فرمت زمان نامعتبر است. مثال: 2024-12-25 09:00");
             }
             return $this->do_schedule($context, $post_id, date('Y-m-d H:i:s', $timestamp));
         }
 
         $post = get_post($post_id);
         if (!$post || $post->post_type !== 'post') {
-            return $this->reply($context, "❌ مقاله‌ای با شناسه <code>{$post_id}</code> یافت نشد.");
+            return $this->reply($context, "❌ مقاله‌ای با شناسه {$post_id} یافت نشد.");
         }
 
         return $this->show_time_picker($context, $post);
@@ -71,8 +71,8 @@ class BotPress_Schedule_Command extends BotPress_Base_Command {
 
         return $this->reply(
             $context,
-            "📅 <b>زمان‌بندی انتشار</b>\n\n" .
-            "📄 <b>{$title}</b>\n\n" .
+            "📅 زمان‌بندی انتشار\n\n" .
+            "📄 {$title}\n\n" .
             "یک زمان برای انتشار انتخاب کنید:",
             $this->inline_keyboard($keyboard)
         );
@@ -81,12 +81,12 @@ class BotPress_Schedule_Command extends BotPress_Base_Command {
     private function ask_custom_time(array $context, int $post_id): array {
         return $this->reply(
             $context,
-            "✏️ <b>زمان دلخواه</b>\n\n" .
+            "✏️ زمان دلخواه\n\n" .
             "تاریخ و ساعت را به این فرمت وارد کنید:\n" .
-            "<code>YYYY-MM-DD HH:MM</code>\n\n" .
-            "مثال: <code>2024-12-25 09:00</code>\n\n" .
+            "YYYY-MM-DD HH:MM\n\n" .
+            "مثال: 2024-12-25 09:00\n\n" .
             "سپس دستور زیر را ارسال کنید:\n" .
-            "<code>/schedule {$post_id} YYYY-MM-DD HH:MM</code>"
+            "/schedule {$post_id} YYYY-MM-DD HH:MM"
         );
     }
 
@@ -120,9 +120,9 @@ class BotPress_Schedule_Command extends BotPress_Base_Command {
 
         return $this->reply(
             $context,
-            "✅ <b>زمان‌بندی ثبت شد!</b>\n\n" .
-            "📄 <b>" . esc_html($post->post_title) . "</b>\n" .
-            "📅 زمان انتشار: <b>{$display_time}</b>\n\n" .
+            "✅ زمان‌بندی ثبت شد!\n\n" .
+            "📄 " . esc_html($post->post_title) . "\n" .
+            "📅 زمان انتشار: {$display_time}\n\n" .
             "برای مشاهده صف انتشار: /pending\n" .
             "برای لغو: /cancel {$queue_id}"
         );

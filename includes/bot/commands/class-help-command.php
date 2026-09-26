@@ -4,7 +4,7 @@ defined('ABSPATH') || exit;
 
 class BotPress_Help_Command extends BotPress_Base_Command {
     public function handle(array $context): array {
-        $text = "📖 <b>راهنمای دستورات</b>\n\n"
+        $text = "📖 راهنمای دستورات\n\n"
             . "/start — شروع و خوش‌آمدگویی\n"
             . "/posts — لیست ۱۰ مقاله اخیر\n"
             . "/post [id] — جزئیات یک مقاله\n"

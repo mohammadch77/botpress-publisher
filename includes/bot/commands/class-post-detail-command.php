@@ -36,7 +36,7 @@ class BotPress_Post_Detail_Command extends BotPress_Base_Command {
         $category = wp_get_post_categories($post->ID, ['fields' => 'names']);
         $category_text = !empty($category) ? implode(', ', $category) : '—';
 
-        $text = "📄 <b>" . esc_html($post->post_title) . "</b>\n\n"
+        $text = "📄 " . esc_html($post->post_title) . "\n\n"
             . "📊 وضعیت: {$status}\n"
             . "📅 تاریخ: " . $this->format_date($post->post_date) . "\n"
             . "✍️ نویسنده: " . esc_html($author) . "\n"

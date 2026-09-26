@@ -29,18 +29,16 @@ class BotPress_Bale_Driver implements BotPress_Bot_Driver_Interface {
 
     public function send_message(string $chat_id, string $text, array $options = []): array {
         return $this->call('sendMessage', array_merge([
-            'chat_id'    => $chat_id,
-            'text'       => $text,
-            'parse_mode' => 'HTML',
+            'chat_id' => $chat_id,
+            'text'    => $text,
         ], $options));
     }
 
     public function send_photo(string $chat_id, string $photo_url, string $caption = '', array $options = []): array {
         return $this->call('sendPhoto', array_merge([
-            'chat_id'    => $chat_id,
-            'photo'      => $photo_url,
-            'caption'    => $caption,
-            'parse_mode' => 'HTML',
+            'chat_id' => $chat_id,
+            'photo'   => $photo_url,
+            'caption' => $caption,
         ], $options));
     }
 
@@ -49,7 +47,6 @@ class BotPress_Bale_Driver implements BotPress_Bot_Driver_Interface {
             'chat_id'    => $chat_id,
             'message_id' => $message_id,
             'text'       => $text,
-            'parse_mode' => 'HTML',
         ], $options));
     }
 

@@ -9,8 +9,8 @@ class BotPress_Cancel_Command extends BotPress_Base_Command {
         if (!$queue_id) {
             return $this->reply(
                 $context,
-                "❌ <b>لغو زمان‌بندی</b>\n\n" .
-                "استفاده: <code>/cancel [شناسه صف]</code>\n\n" .
+                "❌ لغو زمان‌بندی\n\n" .
+                "استفاده: /cancel [شناسه صف]\n\n" .
                 "شناسه صف را از /pending ببینید."
             );
         }
@@ -30,7 +30,7 @@ class BotPress_Cancel_Command extends BotPress_Base_Command {
         if ($success) {
             return $this->reply(
                 $context,
-                "✅ زمان‌بندی با شناسه <code>{$queue_id}</code> لغو شد.\n\n" .
+                "✅ زمان‌بندی با شناسه {$queue_id} لغو شد.\n\n" .
                 "برای مشاهده صف: /pending"
             );
         }

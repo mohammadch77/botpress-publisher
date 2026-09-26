@@ -10,7 +10,7 @@ class BotPress_Template_Engine {
     }
 
     public static function default_template(): string {
-        return "📌 <b>{title}</b>\n\n{excerpt}\n\n🔗 <a href=\"{url}\">ادامه مطلب</a>";
+        return "📌 {title}\n\n{excerpt}\n\n🔗 ادامه مطلب: {url}";
     }
 
     public static function get_templates(): array {
@@ -69,7 +69,7 @@ class BotPress_Template_Engine {
 
     private function build_variables(WP_Post $post): array {
         return [
-            '{title}'    => esc_html($post->post_title),
+            '{title}'    => $post->post_title,
             '{excerpt}'  => $this->get_excerpt($post),
             '{url}'      => get_permalink($post->ID),
             '{date}'     => wp_date('Y/m/d', strtotime($post->post_date)),
