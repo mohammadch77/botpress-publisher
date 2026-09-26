@@ -374,6 +374,41 @@ class BotPress_REST_API {
         return new WP_REST_Response(['channels' => $channels], 200);
     }
 
+    /**
+     * Resolve a human-readable channel identifier (username / link) to a numeric chat_id.
+     * Returns the resolved numeric id as string, or the original value if already numeric.
+     * On failure returns WP_Error with the API description.
+     */
+    private function resolve_chat_id(string $platform, string $chat_id, string $bot_token): string|\WP_Error {
+        // Already a numeric id (with optional leading minus for Telegram).
+        if (preg_match('/^-?\d+$/', $chat_id)) {
+            return $chat_id;
+        }
+
+        // Normalize: strip URL prefix, keep the @username or plain username.
+        $identifier = $chat_id;
+        // https://t.me/username  or  https://ble.ir/username
+        $identifier = preg_replace('#^https?://(t\.me|ble\.ir)/#i', '@', $identifier);
+        // Ensure leading @ for getChat.
+        if (!str_starts_with($identifier, '@')) {
+            $identifier = '@' . $identifier;
+        }
+
+        $driver = BotPress_Driver_Factory::make($platform, $bot_token);
+        if (!$driver) {
+            return new \WP_Error('no_driver', 'درایور پلتفرم در دسترس نیست');
+        }
+
+        $result = $driver->get_chat($identifier);
+
+        if (empty($result['ok']) || empty($result['result']['id'])) {
+            $desc = $result['description'] ?? 'خطا در دریافت اطلاعات کانال';
+            return new \WP_Error('resolve_failed', $desc);
+        }
+
+        return (string) $result['result']['id'];
+    }
+
     public function create_channel(WP_REST_Request $request): WP_REST_Response {
         global $wpdb;
 
@@ -385,6 +420,16 @@ class BotPress_REST_API {
         if (!$name || !in_array($platform, ['telegram', 'bale'], true) || !$chat_id || !$bot_token) {
             return new WP_REST_Response(['success' => false, 'message' => 'invalid_params'], 400);
         }
+
+        // Resolve username / link → numeric id.
+        $resolved = $this->resolve_chat_id($platform, $chat_id, $bot_token);
+        if (is_wp_error($resolved)) {
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => 'پارامتر(های) نامعتبر: ' . $resolved->get_error_message(),
+            ], 400);
+        }
+        $chat_id = $resolved;
 
         $now = current_time('mysql');
 

@@ -43,7 +43,7 @@
             { label: 'Bale', value: 'bale' },
           ]"
         />
-        <Input v-model="form.chat_id" label="Chat ID" placeholder="-1001234567890" />
+        <Input v-model="form.chat_id" label="Chat ID / لینک کانال" :placeholder="form.platform === 'telegram' ? 'مثال: https://t.me/mychannel یا @mychannel' : 'مثال: https://ble.ir/mychannel یا @mychannel'" />
         <Input v-model="form.bot_token" label="Bot Token" type="password" placeholder="123456:ABC-DEF..." />
         <p v-if="formError" class="text-sm text-red-500">{{ formError }}</p>
         <div class="flex justify-end gap-2">
@@ -125,8 +125,17 @@ async function saveChannel() {
     formError.value = 'همه فیلدها الزامی هستند.'
     return
   }
-  if (form.platform === 'telegram' && !form.chat_id.startsWith('-')) {
-    formError.value = 'شناسه کانال تلگرام باید با - شروع شود.'
+  // Telegram: numeric id (starts with -), @username, or t.me link
+  // Bale: numeric id, @username, or ble.ir link
+  const isNumeric = /^-?\d+$/.test(form.chat_id)
+  const isUsername = /^@?\w{3,}$/.test(form.chat_id)
+  const isTelegramLink = /^https?:\/\/t\.me\//i.test(form.chat_id)
+  const isBaleLink = /^https?:\/\/ble\.ir\//i.test(form.chat_id)
+  const isValidLink = form.platform === 'telegram' ? (isTelegramLink || isUsername || isNumeric) : (isBaleLink || isUsername || isNumeric)
+  if (!isValidLink) {
+    formError.value = form.platform === 'telegram'
+      ? 'شناسه کانال را به صورت عدد، @username یا لینک t.me وارد کنید.'
+      : 'شناسه کانال را به صورت عدد، @username یا لینک ble.ir وارد کنید.'
     return
   }
   saving.value = true
