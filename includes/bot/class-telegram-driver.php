@@ -15,7 +15,7 @@ class BotPress_Telegram_Driver implements BotPress_Bot_Driver_Interface {
 
         $response = wp_remote_post($url, [
             'headers' => ['Content-Type' => 'application/json'],
-            'body'    => wp_json_encode($params),
+            'body'    => json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'timeout' => 15,
         ]);
 
