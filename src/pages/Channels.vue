@@ -125,8 +125,8 @@ async function saveChannel() {
     formError.value = 'همه فیلدها الزامی هستند.'
     return
   }
-  if (!form.chat_id.startsWith('-')) {
-    formError.value = 'شناسه کانال باید با - شروع شود.'
+  if (form.platform === 'telegram' && !form.chat_id.startsWith('-')) {
+    formError.value = 'شناسه کانال تلگرام باید با - شروع شود.'
     return
   }
   saving.value = true
