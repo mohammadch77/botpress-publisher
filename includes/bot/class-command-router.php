@@ -6,6 +6,7 @@ class BotPress_Command_Router {
     public function route(string $platform, array $payload): void {
         $driver = BotPress_Driver_Factory::make($platform);
         if (!$driver) {
+            BotPress_Debug_Log::add($platform, 'error', 'توکن ربات تنظیم نشده؛ پاسخی ارسال نشد');
             return;
         }
 
@@ -14,7 +15,7 @@ class BotPress_Command_Router {
             return;
         }
 
-        $message = $payload['message'] ?? $payload['channel_post'] ?? null;
+        $message = $payload['message'] ?? null;
         if (!$message) {
             return;
         }
@@ -95,12 +96,20 @@ class BotPress_Command_Router {
     }
 
     private function handle_callback(BotPress_Bot_Driver_Interface $driver, array $callback): void {
-        $callback_id = $callback['id'];
-        $data = $callback['data'] ?? '';
-        $chat_id = (string) $callback['message']['chat']['id'];
-        $message_id = (int) $callback['message']['message_id'];
+        $callback_id = (string) ($callback['id'] ?? '');
+        $data = (string) ($callback['data'] ?? '');
+        $chat_id = (string) ($callback['message']['chat']['id'] ?? $callback['from']['id'] ?? '');
+        $message_id = (int) ($callback['message']['message_id'] ?? 0);
 
-        $driver->answer_callback($callback_id);
+        if ($chat_id === '') {
+            BotPress_Debug_Log::add($driver->get_platform(), 'error', 'دکمه بدون شناسه چت', (string) wp_json_encode($callback));
+            return;
+        }
+        BotPress_Debug_Log::add($driver->get_platform(), 'info', "اجرای دکمه «{$data}» (chat={$chat_id}, message={$message_id})");
+
+        if ($callback_id !== '') {
+            $driver->answer_callback($callback_id);
+        }
 
         [$action, $value] = array_pad(explode(':', $data, 2), 2, '');
 
@@ -129,6 +138,8 @@ class BotPress_Command_Router {
             case 'cancel_queue':
                 (new BotPress_Cancel_Command())->handle_callback($context);
                 break;
+            default:
+                BotPress_Debug_Log::add($driver->get_platform(), 'warn', "دکمه ناشناخته: {$action}");
         }
     }
 }

@@ -1,6 +1,6 @@
 <template>
   <div class="overflow-x-auto rounded-xl border border-surface-3">
-    <table class="w-full text-left text-sm">
+    <table class="w-full text-start text-sm">
       <tbody>
         <tr v-for="row in rows" :key="row" class="border-b border-surface-3 last:border-0">
           <td v-for="col in columns" :key="col" class="px-4 py-3">

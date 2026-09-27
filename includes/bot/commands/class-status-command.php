@@ -15,19 +15,19 @@ class BotPress_Status_Command extends BotPress_Base_Command {
         );
 
         $published_today = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$wpdb->prefix}botpress_publish_queue WHERE status = 'published' AND DATE(published_at) = CURDATE()"
+            $wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}botpress_publish_queue WHERE status = 'published' AND DATE(published_at) = %s", current_time('Y-m-d'))
         );
 
         $failed_today = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$wpdb->prefix}botpress_publish_queue WHERE status = 'failed' AND DATE(updated_at) = CURDATE()"
+            $wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}botpress_publish_queue WHERE status = 'failed' AND DATE(updated_at) = %s", current_time('Y-m-d'))
         );
 
         $channels = $wpdb->get_results(
             "SELECT name, platform, is_active FROM {$wpdb->prefix}botpress_channels ORDER BY id DESC"
         );
 
-        $text = "📊 <b>وضعیت سیستم</b>\n\n"
-            . "🌐 سایت: " . esc_html(get_site_url()) . "\n"
+        $text = "📊 *وضعیت سیستم*\n\n"
+            . "🌐 سایت: " . $this->md(get_site_url()) . "\n"
             . "📝 کل مقالات: {$total_posts}\n"
             . "📅 در صف: {$pending}\n"
             . "✅ منتشرشده امروز: {$published_today}\n"
@@ -39,7 +39,7 @@ class BotPress_Status_Command extends BotPress_Base_Command {
         } else {
             foreach ($channels as $channel) {
                 $status_icon = $channel->is_active ? '✅' : '❌';
-                $text .= "• " . esc_html($channel->name) . " ({$channel->platform}) {$status_icon}\n";
+                $text .= "• " . $this->md($channel->name) . " ({$channel->platform}) {$status_icon}\n";
             }
         }
 

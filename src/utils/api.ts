@@ -26,6 +26,14 @@ export const api = axios.create({
   },
 })
 
+api.interceptors.request.use((request) => {
+  if ((request.method ?? 'get').toLowerCase() === 'get') {
+    request.params = { ...request.params, _: Date.now() }
+  }
+  request.headers.set('Cache-Control', 'no-cache')
+  return request
+})
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {

@@ -6,10 +6,10 @@
       @click="mobileOpen = false"
     />
     <aside
-      class="flex flex-col border-r border-surface-3 bg-white transition-all"
+      class="flex flex-col border-e border-surface-3 bg-white transition-all"
       :class="[
         appStore.sidebarCollapsed ? 'w-16' : 'w-60',
-        'fixed inset-y-0 z-40 md:static',
+        'fixed inset-y-0 end-auto start-0 z-40 md:static',
         mobileOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0',
       ]"
     >
@@ -17,7 +17,7 @@
         <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-white">
           <Share2 class="h-4 w-4" />
         </div>
-        <span v-if="!appStore.sidebarCollapsed" class="text-sm font-bold text-slate-800">BotPress</span>
+        <span v-if="!appStore.sidebarCollapsed" class="text-sm font-bold text-slate-800">بات‌پرس</span>
       </div>
 
       <nav class="flex flex-1 flex-col gap-1 px-3">
@@ -34,10 +34,10 @@
       </nav>
 
       <div class="flex items-center justify-between px-4 py-4">
-        <span v-if="!appStore.sidebarCollapsed" class="text-xs text-slate-400">v{{ version }}</span>
-        <button class="text-slate-400 hover:text-slate-600" @click="appStore.toggleSidebar">
-          <ChevronsLeft v-if="!appStore.sidebarCollapsed" class="h-4 w-4" />
-          <ChevronsRight v-else class="h-4 w-4" />
+        <span v-if="!appStore.sidebarCollapsed" class="text-xs text-slate-400">نسخهٔ <span dir="ltr">{{ version }}</span></span>
+        <button class="text-slate-400 hover:text-slate-600" :aria-label="appStore.sidebarCollapsed ? 'باز کردن منو' : 'جمع کردن منو'" @click="appStore.toggleSidebar">
+          <ChevronsRight v-if="!appStore.sidebarCollapsed" class="h-4 w-4" />
+          <ChevronsLeft v-else class="h-4 w-4" />
         </button>
       </div>
     </aside>
@@ -53,10 +53,10 @@
         <div class="flex items-center gap-4">
           <div class="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
             <StatusDot :status="appStore.botConnected ? 'active' : 'inactive'" />
-            {{ appStore.botConnected ? 'Bot Connected' : 'Bot Disconnected' }}
+            {{ appStore.botConnected ? 'ربات متصل است' : 'ربات متصل نیست' }}
           </div>
           <a :href="authStore.siteUrl" target="_blank" class="text-sm text-brand-600 hover:underline">
-            View Site
+            مشاهدهٔ سایت
           </a>
         </div>
       </header>
@@ -82,6 +82,9 @@ import {
   ChevronsRight,
   Clock,
   Menu,
+  Newspaper,
+  Sparkles,
+  Cpu,
 } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
@@ -94,11 +97,14 @@ const version = authStore.version
 const mobileOpen = ref(false)
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/channels', label: 'Channels', icon: Radio },
-  { path: '/bot-settings', label: 'Bot Settings', icon: Bot },
-  { path: '/templates', label: 'Templates', icon: FileText },
-  { path: '/logs', label: 'Logs', icon: ScrollText },
+  { path: '/', label: 'پیشخوان', icon: LayoutDashboard },
+  { path: '/posts', label: 'مقالات و انتشار', icon: Newspaper },
+  { path: '/ai-writer', label: 'تولید مقاله با هوش مصنوعی', icon: Sparkles },
+  { path: '/channels', label: 'کانال‌ها', icon: Radio },
+  { path: '/bot-settings', label: 'تنظیمات ربات', icon: Bot },
+  { path: '/templates', label: 'قالب پیام‌ها', icon: FileText },
+  { path: '/logs', label: 'گزارش‌ها', icon: ScrollText },
+  { path: '/ai-settings', label: 'تنظیمات هوش مصنوعی', icon: Cpu },
   { path: '/queue', label: 'صف انتشار', icon: Clock },
 ]
 

@@ -1,23 +1,23 @@
 <template>
   <div class="flex flex-col gap-6">
-    <Card title="System Status">
+    <Card title="وضعیت سیستم">
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div class="flex items-center gap-2 text-sm">
           <StatusDot :status="botSettings.telegram.connected ? 'active' : 'inactive'" />
-          Telegram Bot — {{ botSettings.telegram.connected ? 'متصل' : 'قطع' }}
+          ربات تلگرام — {{ botSettings.telegram.connected ? 'متصل' : 'قطع' }}
         </div>
         <div class="flex items-center gap-2 text-sm">
           <StatusDot :status="botSettings.bale.connected ? 'active' : 'inactive'" />
-          Bale Bot — {{ botSettings.bale.connected ? 'متصل' : 'قطع' }}
+          ربات بله — {{ botSettings.bale.connected ? 'متصل' : 'قطع' }}
         </div>
       </div>
     </Card>
 
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <StatCard label="Total Channels" :value="stats.total_channels" :icon="Radio" :loading="loading" />
-      <StatCard label="Published Today" :value="stats.published_today" :icon="Send" :loading="loading" />
+      <StatCard label="تعداد کانال‌ها" :value="stats.total_channels" :icon="Radio" :loading="loading" />
+      <StatCard label="منتشرشدهٔ امروز" :value="stats.published_today" :icon="Send" :loading="loading" />
       <StatCard
-        label="Pending in Queue"
+        label="در صف انتشار"
         :value="stats.pending_in_queue"
         :icon="Clock"
         :loading="loading"
@@ -25,7 +25,7 @@
         @click="router.push('/queue')"
       />
       <StatCard
-        label="Failed Today"
+        label="ناموفق امروز"
         :value="stats.failed_today"
         :icon="AlertTriangle"
         :loading="loading"
@@ -33,27 +33,30 @@
       />
     </div>
 
-    <Card title="Recent Activity">
+    <Card title="فعالیت‌های اخیر">
       <Table
         :columns="columns"
         :rows="stats.recent_activity"
         :loading="loading"
-        empty-message="No recent activity yet"
+        empty-message="هنوز فعالیتی ثبت نشده است"
       >
         <template #cell-status="{ row }">
           <Badge :variant="row.status === 'success' ? 'success' : row.status === 'failed' ? 'danger' : 'info'" dot>
-            {{ row.status }}
+            {{ labelOf(logStatusLabels, row.status) }}
           </Badge>
         </template>
+        <template #cell-action="{ row }">{{ labelOf(actionLabels, row.action) }}</template>
+        <template #cell-platform="{ row }">{{ labelOf(platformLabels, row.platform) }}</template>
+        <template #cell-created_at="{ row }">{{ formatSiteDate(row.created_at) }}</template>
       </Table>
     </Card>
 
-    <Card title="Quick Actions">
+    <Card title="اقدامات سریع">
       <div class="flex flex-col gap-4">
         <div class="flex flex-wrap items-end gap-3">
-          <Input v-model="quickPostId" label="Post ID" placeholder="42" />
+          <Input v-model="quickPostId" label="شناسهٔ مقاله" placeholder="42" />
           <Button variant="primary" :icon-left="Send" :loading="publishing" @click="handleQuickPublish">
-            Publish Now
+            انتشار فوری
           </Button>
         </div>
         <p v-if="quickPublishMessage" class="text-sm" :class="quickPublishSuccess ? 'text-emerald-600' : 'text-red-500'">
@@ -61,10 +64,10 @@
         </p>
 
         <div class="flex flex-wrap items-end gap-3 border-t border-surface-3 pt-4">
-          <Input v-model="scheduleForm.postId" label="Post ID" placeholder="42" />
-          <DateTimePicker v-model="scheduleForm.scheduledAt" label="Scheduled At" />
-          <Button variant="secondary" :loading="scheduling" @click="handleQuickSchedule">Schedule</Button>
-          <router-link to="/queue" class="text-sm text-brand-600 hover:underline">View Queue →</router-link>
+          <Input v-model="scheduleForm.postId" label="شناسهٔ مقاله" placeholder="42" />
+          <DateTimePicker v-model="scheduleForm.scheduledAt" label="زمان انتشار" />
+          <Button variant="secondary" :loading="scheduling" @click="handleQuickSchedule">زمان‌بندی</Button>
+          <router-link to="/queue" class="text-sm text-brand-600 hover:underline">مشاهدهٔ صف انتشار ←</router-link>
         </div>
         <p v-if="scheduleMessage" class="text-sm" :class="scheduleSuccess ? 'text-emerald-600' : 'text-red-500'">
           {{ scheduleMessage }}
@@ -89,6 +92,7 @@ import StatusDot from '@/components/ui/StatusDot.vue'
 import { api } from '@/utils/api'
 import { useToast } from '@/composables/useToast'
 import type { BotSettings, DashboardStats } from '@/types'
+import { actionLabels, formatSiteDate, labelOf, logStatusLabels, platformLabels } from '@/utils/format'
 
 const toast = useToast()
 const router = useRouter()
@@ -117,10 +121,10 @@ const scheduleMessage = ref('')
 const scheduleSuccess = ref(false)
 
 const columns = [
-  { key: 'action', label: 'Action' },
-  { key: 'platform', label: 'Platform' },
-  { key: 'status', label: 'Status' },
-  { key: 'created_at', label: 'Time' },
+  { key: 'action', label: 'عملیات' },
+  { key: 'platform', label: 'پلتفرم' },
+  { key: 'status', label: 'وضعیت' },
+  { key: 'created_at', label: 'زمان' },
 ]
 
 let refreshTimer: ReturnType<typeof setInterval> | undefined

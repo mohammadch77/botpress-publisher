@@ -4,7 +4,7 @@ defined('ABSPATH') || exit;
 
 class BotPress_Start_Command extends BotPress_Base_Command {
     public function handle(array $context): array {
-        $name = $context['from']['first_name'] ?? '';
+        $name = $this->md($context['from']['first_name'] ?? '');
 
         $text = "سلام {$name}! 👋\n\n"
             . "به ربات BotPress Publisher خوش آمدید.\n\n"

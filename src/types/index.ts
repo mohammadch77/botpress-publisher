@@ -36,7 +36,7 @@ export interface QueueItem {
   post_title?: string | null
   channel_id: number | null
   publish_target: 'wordpress' | 'channel' | 'both'
-  status: 'pending' | 'processing' | 'published' | 'failed'
+  status: 'pending' | 'processing' | 'published' | 'failed' | 'cancelled'
   scheduled_at: string
   published_at?: string | null
   attempts: number
@@ -51,10 +51,68 @@ export interface PlatformSettings {
   connected: boolean
 }
 
+export type PublishTarget = 'wordpress' | 'channel' | 'both'
+
+export interface PostItem {
+  id: number
+  title: string
+  status: 'publish' | 'draft' | 'future' | 'pending' | string
+  date: string
+  modified: string
+  author: string
+  thumbnail: string | null
+  edit_url: string
+  view_url: string
+  queue: { id: number; scheduled_at: string; target: PublishTarget } | null
+}
+
+export interface SchedulePreset {
+  key: string
+  label: string
+  at: string
+}
+
+export interface WebhookStatus {
+  checked: boolean
+  matches: boolean
+  expected_url: string
+  registered_url: string | null
+  pending_updates: number | null
+  last_error_message: string | null
+  last_error_at?: string | null
+  last_received_at: string | null
+}
+
 export interface BotSettings {
   telegram: PlatformSettings
   bale: PlatformSettings
   authorized_users: string[]
   notify_on_publish: boolean
   notify_on_fail: boolean
+}
+
+export type AiMode = 'server' | 'byok'
+
+export interface AiSettings {
+  mode: AiMode
+  server_url: string
+  has_license: boolean
+  license_masked: string
+  byok_base_url: string
+  byok_auth: 'apikey' | 'bearer'
+  has_byok_key: boolean
+  byok_key_masked: string
+  byok_model: string
+}
+
+export interface AiAccount {
+  mode: AiMode
+  connected?: boolean
+  error?: string
+  customer?: string
+  site?: string
+  status?: string
+  credits?: number
+  pro_credit_cost?: number
+  features?: { article_generation: boolean }
 }

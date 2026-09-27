@@ -12,5 +12,6 @@ interface BotPress_Bot_Driver_Interface {
     public function get_me(): array;
     public function set_webhook(string $url, string $secret = ''): array;
     public function delete_webhook(): array;
+    public function get_webhook_info(): array;
     public function get_platform(): string;
 }

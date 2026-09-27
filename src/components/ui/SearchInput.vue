@@ -1,16 +1,16 @@
 <template>
   <div class="relative">
-    <Search class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+    <Search class="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
     <input
       :value="modelValue"
       type="text"
       :placeholder="placeholder"
-      class="btn-focus w-full rounded-lg border border-surface-3 py-2 pl-9 pr-9 text-sm text-slate-800 placeholder:text-slate-400"
+      class="btn-focus w-full rounded-lg border border-surface-3 py-2 ps-9 pe-9 text-sm text-slate-800 placeholder:text-slate-400"
       @input="onInput"
     />
     <button
       v-if="modelValue"
-      class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+      class="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
       @click="clear"
     >
       <X class="h-4 w-4" />
@@ -27,7 +27,7 @@ const props = withDefaults(
     placeholder?: string
     debounce?: number
   }>(),
-  { modelValue: '', placeholder: 'Search...', debounce: 300 }
+  { modelValue: '', placeholder: 'جست‌وجو...', debounce: 300 }
 )
 
 const emit = defineEmits<{

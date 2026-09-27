@@ -2,52 +2,53 @@
   <div class="flex flex-col gap-6">
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div class="flex flex-wrap gap-3">
-        <Select v-model="filters.platform" label="Platform" :options="platformOptions" @update:modelValue="reload" />
-        <Select v-model="filters.status" label="Status" :options="statusOptions" @update:modelValue="reload" />
+        <Select v-model="filters.platform" label="پلتفرم" :options="platformOptions" @update:modelValue="reload" />
+        <Select v-model="filters.status" label="وضعیت" :options="statusOptions" @update:modelValue="reload" />
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium text-slate-700">From</label>
+          <label class="text-sm font-medium text-slate-700">از تاریخ</label>
           <input v-model="filters.from" type="date" class="btn-focus rounded-lg border border-surface-3 px-3 py-2 text-sm" @change="reload" />
         </div>
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium text-slate-700">To</label>
+          <label class="text-sm font-medium text-slate-700">تا تاریخ</label>
           <input v-model="filters.to" type="date" class="btn-focus rounded-lg border border-surface-3 px-3 py-2 text-sm" @change="reload" />
         </div>
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium text-slate-700">Search</label>
-          <SearchInput v-model="filters.search" placeholder="Search message..." @search="reload" />
+          <label class="text-sm font-medium text-slate-700">جست‌وجو</label>
+          <SearchInput v-model="filters.search" placeholder="جست‌وجو در متن گزارش..." @search="reload" />
         </div>
       </div>
       <div class="flex gap-2">
-        <Button variant="outline" @click="handleExport">Export CSV</Button>
-        <Button variant="danger" @click="handleClear">Clear Logs</Button>
+        <Button variant="outline" @click="handleExport">خروجی CSV</Button>
+        <Button variant="danger" @click="handleClear">پاک کردن گزارش‌ها</Button>
       </div>
     </div>
 
     <Card>
       <TableSkeleton v-if="loading" :rows="5" :columns="columns.length" />
-      <Table v-else :columns="columns" :rows="logs" empty-message="No logs found">
+      <Table v-else :columns="columns" :rows="logs" empty-message="گزارشی پیدا نشد">
         <template #cell-platform="{ row }">
-          <Badge v-if="row.platform" variant="neutral">{{ row.platform }}</Badge>
+          <Badge v-if="row.platform" variant="neutral">{{ labelOf(platformLabels, row.platform) }}</Badge>
           <span v-else>—</span>
         </template>
         <template #cell-status="{ row }">
           <Badge :variant="row.status === 'success' ? 'success' : row.status === 'failed' ? 'danger' : 'info'" dot>
-            {{ row.status }}
+            {{ labelOf(logStatusLabels, row.status) }}
           </Badge>
         </template>
+        <template #cell-action="{ row }">{{ labelOf(actionLabels, row.action) }}</template>
         <template #cell-created_at="{ row }">
           {{ formatDate(row.created_at) }}
         </template>
         <template #cell-message="{ row }">
-          <button class="text-left hover:underline" @click="openDetail(row as LogEntry)">{{ row.message }}</button>
+          <button class="text-start hover:underline" @click="openDetail(row as LogEntry)">{{ row.message }}</button>
         </template>
       </Table>
 
       <Pagination class="mt-4" :page="page" :total-pages="totalPages" :total="total" @update:page="changePage" />
     </Card>
 
-    <Modal v-model="showDetail" title="Log Detail">
-      <pre v-if="selectedLog" class="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-1 p-3 text-xs text-slate-700">{{ JSON.stringify(selectedLog, null, 2) }}</pre>
+    <Modal v-model="showDetail" title="جزئیات گزارش">
+      <pre v-if="selectedLog" dir="ltr" class="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-1 p-3 text-xs text-slate-700">{{ JSON.stringify(selectedLog, null, 2) }}</pre>
     </Modal>
   </div>
 </template>
@@ -66,6 +67,7 @@ import Modal from '@/components/ui/Modal.vue'
 import { api, botpressConfig } from '@/utils/api'
 import { useToast } from '@/composables/useToast'
 import type { LogEntry } from '@/types'
+import { actionLabels, formatSiteDate, labelOf, logStatusLabels, platformLabels } from '@/utils/format'
 
 const toast = useToast()
 const loading = ref(true)
@@ -78,25 +80,25 @@ const showDetail = ref(false)
 const selectedLog = ref<LogEntry | null>(null)
 
 const platformOptions = [
-  { label: 'All Platforms', value: '' },
-  { label: 'Telegram', value: 'telegram' },
-  { label: 'Bale', value: 'bale' },
-  { label: 'WordPress', value: 'wordpress' },
+  { label: 'همهٔ پلتفرم‌ها', value: '' },
+  { label: 'تلگرام', value: 'telegram' },
+  { label: 'بله', value: 'bale' },
+  { label: 'وردپرس', value: 'wordpress' },
 ]
 
 const statusOptions = [
-  { label: 'All Statuses', value: '' },
-  { label: 'Success', value: 'success' },
-  { label: 'Failed', value: 'failed' },
-  { label: 'Info', value: 'info' },
+  { label: 'همهٔ وضعیت‌ها', value: '' },
+  { label: 'موفق', value: 'success' },
+  { label: 'ناموفق', value: 'failed' },
+  { label: 'اطلاع', value: 'info' },
 ]
 
 const columns = [
-  { key: 'action', label: 'Action' },
-  { key: 'platform', label: 'Platform' },
-  { key: 'status', label: 'Status' },
-  { key: 'message', label: 'Message' },
-  { key: 'created_at', label: 'Time' },
+  { key: 'action', label: 'عملیات' },
+  { key: 'platform', label: 'پلتفرم' },
+  { key: 'status', label: 'وضعیت' },
+  { key: 'message', label: 'پیام' },
+  { key: 'created_at', label: 'زمان' },
 ]
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
@@ -159,7 +161,7 @@ function handleExport() {
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString()
+  return formatSiteDate(value)
 }
 
 onMounted(() => {

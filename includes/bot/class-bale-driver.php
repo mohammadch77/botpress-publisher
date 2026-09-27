@@ -7,49 +7,75 @@ class BotPress_Bale_Driver implements BotPress_Bot_Driver_Interface {
     private string $token;
 
     public function __construct(string $token) {
-        $this->token = $token;
+        $this->token = trim($token);
     }
 
     private function call(string $method, array $params = []): array {
+        $result = $this->request($method, $params);
+        if (!($result['ok'] ?? false) && class_exists('BotPress_Debug_Log')) {
+            BotPress_Debug_Log::add('bale', 'error', "خطای API در {$method}", (string) ($result['description'] ?? 'unknown'));
+        }
+        return $result;
+    }
+
+    private function request(string $method, array $params = []): array {
         $url = $this->base_url . $this->token . '/' . $method;
 
         $response = wp_remote_post($url, [
             'headers' => ['Content-Type' => 'application/json'],
-            'body'    => wp_json_encode($params),
-            'timeout' => 15,
+            'body'    => $params ? wp_json_encode($params) : '{}',
+            'timeout' => 20,
         ]);
 
         if (is_wp_error($response)) {
-            return ['ok' => false, 'description' => $response->get_error_message()];
+            return ['ok' => false, 'description' => 'اتصال به سرور بله ناموفق بود: ' . $response->get_error_message()];
         }
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
-        return $body ?? ['ok' => false, 'description' => 'Invalid response'];
+        if (!is_array($body)) {
+            $code = wp_remote_retrieve_response_code($response);
+            return ['ok' => false, 'description' => "پاسخ نامعتبر از سرور بله (HTTP {$code})"];
+        }
+        return $body;
+    }
+
+    // Bale renders Markdown natively; no parse_mode is sent.
+    private function send_formatted(string $method, array $params): array {
+        $result = $this->call($method, $params);
+        if (($result['ok'] ?? false) || (int) ($result['error_code'] ?? 0) !== 400) {
+            return $result;
+        }
+        if (stripos((string) ($result['description'] ?? ''), 'not modified') !== false) {
+            return $result;
+        }
+        foreach (['text', 'caption'] as $key) {
+            if (isset($params[$key])) {
+                $params[$key] = BotPress_Markdown::to_plain($params[$key]);
+            }
+        }
+        return $this->call($method, $params);
     }
 
     public function send_message(string $chat_id, string $text, array $options = []): array {
-        return $this->call('sendMessage', array_merge([
-            'chat_id'    => $chat_id,
-            'text'       => $text,
-            'parse_mode' => 'HTML',
+        return $this->send_formatted('sendMessage', array_merge([
+            'chat_id' => $chat_id,
+            'text'    => $text,
         ], $options));
     }
 
     public function send_photo(string $chat_id, string $photo_url, string $caption = '', array $options = []): array {
-        return $this->call('sendPhoto', array_merge([
-            'chat_id'    => $chat_id,
-            'photo'      => $photo_url,
-            'caption'    => $caption,
-            'parse_mode' => 'HTML',
+        return $this->send_formatted('sendPhoto', array_merge([
+            'chat_id' => $chat_id,
+            'photo'   => $photo_url,
+            'caption' => $caption,
         ], $options));
     }
 
     public function edit_message(string $chat_id, int $message_id, string $text, array $options = []): array {
-        return $this->call('editMessageText', array_merge([
+        return $this->send_formatted('editMessageText', array_merge([
             'chat_id'    => $chat_id,
             'message_id' => $message_id,
             'text'       => $text,
-            'parse_mode' => 'HTML',
         ], $options));
     }
 
@@ -84,6 +110,10 @@ class BotPress_Bale_Driver implements BotPress_Bot_Driver_Interface {
 
     public function delete_webhook(): array {
         return $this->call('deleteWebhook');
+    }
+
+    public function get_webhook_info(): array {
+        return $this->call('getWebhookInfo');
     }
 
     public function get_platform(): string {

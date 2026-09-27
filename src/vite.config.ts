@@ -15,7 +15,7 @@ export default defineConfig({
             input: path.resolve(__dirname, 'main.ts'),
             output: {
                 entryFileNames: 'index.js',
-                chunkFileNames: 'chunks/[name]-[hash].js',
+                inlineDynamicImports: true,
                 assetFileNames: (info) => {
                     if (info.name?.endsWith('.css')) return 'index.css'
                     return 'assets/[name]-[hash][extname]'

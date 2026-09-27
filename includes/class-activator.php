@@ -63,7 +63,7 @@ class BotPress_Activator {
             post_id BIGINT UNSIGNED NOT NULL,
             channel_id INT UNSIGNED NULL,
             publish_target ENUM('wordpress','channel','both') NOT NULL DEFAULT 'both',
-            status ENUM('pending','processing','published','failed') NOT NULL DEFAULT 'pending',
+            status ENUM('pending','processing','published','failed','cancelled') NOT NULL DEFAULT 'pending',
             scheduled_at DATETIME NOT NULL,
             published_at DATETIME NULL,
             attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
@@ -92,6 +92,30 @@ class BotPress_Activator {
         ) $charset");
 
         update_option('botpress_db_version', BOTPRESS_VERSION);
+        update_option('botpress_schema_version', self::SCHEMA_VERSION);
+    }
+
+    private const SCHEMA_VERSION = 2;
+
+    /** Plugin updates via zip upload don't re-run activation, so schema changes are applied lazily here. */
+    public static function maybe_upgrade(): void {
+        $current = (int) get_option('botpress_schema_version', 1);
+        if ($current >= self::SCHEMA_VERSION) {
+            return;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'botpress_publish_queue';
+
+        if ($current < 2) {
+            $wpdb->query("ALTER TABLE {$table} MODIFY status ENUM('pending','processing','published','failed','cancelled') NOT NULL DEFAULT 'pending'");
+            $wpdb->query(
+                "UPDATE {$table} SET status = 'cancelled'
+                 WHERE status = 'failed' AND (last_error LIKE 'لغو شده%' OR last_error LIKE 'منتشر شد (%')"
+            );
+        }
+
+        update_option('botpress_schema_version', self::SCHEMA_VERSION);
     }
 
     private static function set_default_options(): void {
@@ -99,13 +123,9 @@ class BotPress_Activator {
         add_option('botpress_bot_token_bale_enc', '');
         add_option('botpress_webhook_secret', wp_generate_password(32, false));
         add_option('botpress_authorized_users', []);
-        add_option('botpress_default_template', self::default_template());
+        add_option('botpress_default_template', BotPress_Template_Engine::default_template());
         add_option('botpress_notify_on_publish', true);
         add_option('botpress_notify_on_fail', true);
-    }
-
-    private static function default_template(): string {
-        return "📌 <b>{title}</b>\n\n{excerpt}\n\n🔗 <a href=\"{url}\">ادامه مطلب</a>";
     }
 
     private static function schedule_cron(): void {

@@ -10,25 +10,28 @@ class BotPress_Template_Engine {
     }
 
     public static function default_template(): string {
-        return "📌 <b>{title}</b>\n\n{excerpt}\n\n🔗 <a href=\"{url}\">ادامه مطلب</a>";
+        return "📌 *{title}*\n\n{excerpt}\n\n🔗 [ادامه مطلب]({url})";
     }
 
     public static function get_templates(): array {
         $stored = get_option('botpress_templates', null);
         if (is_array($stored)) {
-            return array_merge(
+            $templates = array_merge(
                 ['default' => self::default_template(), 'telegram' => '', 'bale' => ''],
                 $stored
             );
+        } else {
+            // Migrate legacy single-template option.
+            $legacy = (string) get_option('botpress_default_template', '');
+            $templates = [
+                'default'  => $legacy !== '' ? $legacy : self::default_template(),
+                'telegram' => '',
+                'bale'     => '',
+            ];
         }
 
-        // Migrate legacy single-template option.
-        $legacy = get_option('botpress_default_template', '');
-        return [
-            'default'  => $legacy !== '' ? $legacy : self::default_template(),
-            'telegram' => '',
-            'bale'     => '',
-        ];
+        // Templates saved before the switch to Markdown may still contain HTML.
+        return array_map(static fn($t) => BotPress_Markdown::from_html((string) $t), $templates);
     }
 
     public static function get_template(string $platform = 'default'): string {
@@ -40,16 +43,16 @@ class BotPress_Template_Engine {
     }
 
     public static function save_templates(array $templates): void {
-        $clean = [
-            'default'  => wp_kses_post((string) ($templates['default'] ?? self::default_template())),
-            'telegram' => wp_kses_post((string) ($templates['telegram'] ?? '')),
-            'bale'     => wp_kses_post((string) ($templates['bale'] ?? '')),
-        ];
-        update_option('botpress_templates', $clean);
+        $clean = static fn($t) => trim(BotPress_Markdown::from_html((string) $t));
+        update_option('botpress_templates', [
+            'default'  => $clean($templates['default'] ?? self::default_template()) ?: self::default_template(),
+            'telegram' => $clean($templates['telegram'] ?? ''),
+            'bale'     => $clean($templates['bale'] ?? ''),
+        ]);
     }
 
     public function render(WP_Post $post): string {
-        return strtr($this->template, $this->build_variables($post));
+        return strtr(BotPress_Markdown::from_html($this->template), $this->build_variables($post));
     }
 
     public static function preview(string $template): string {
@@ -64,19 +67,19 @@ class BotPress_Template_Engine {
             '{site}'     => get_bloginfo('name'),
         ];
 
-        return strtr($template, $sample);
+        return strtr(BotPress_Markdown::from_html($template), $sample);
     }
 
     private function build_variables(WP_Post $post): array {
         return [
-            '{title}'    => esc_html($post->post_title),
-            '{excerpt}'  => $this->get_excerpt($post),
-            '{url}'      => get_permalink($post->ID),
-            '{date}'     => wp_date('Y/m/d', strtotime($post->post_date)),
-            '{author}'   => get_the_author_meta('display_name', $post->post_author),
+            '{title}'    => BotPress_Markdown::escape($post->post_title),
+            '{excerpt}'  => BotPress_Markdown::escape($this->get_excerpt($post)),
+            '{url}'      => BotPress_Markdown::url((string) get_permalink($post->ID)),
+            '{date}'     => mysql2date('Y/m/d', $post->post_date),
+            '{author}'   => BotPress_Markdown::escape(get_the_author_meta('display_name', $post->post_author)),
             '{category}' => $this->get_category($post),
             '{tags}'     => $this->get_tags($post),
-            '{site}'     => get_bloginfo('name'),
+            '{site}'     => BotPress_Markdown::escape(get_bloginfo('name')),
         ];
     }
 
@@ -88,7 +91,7 @@ class BotPress_Template_Engine {
 
     private function get_category(WP_Post $post): string {
         $categories = wp_get_post_categories($post->ID, ['fields' => 'names']);
-        return !empty($categories) ? esc_html($categories[0]) : '';
+        return !empty($categories) ? BotPress_Markdown::escape($categories[0]) : '';
     }
 
     private function get_tags(WP_Post $post): string {
@@ -96,7 +99,7 @@ class BotPress_Template_Engine {
         if (!$tags) {
             return '';
         }
-        return implode('، ', array_map(static fn($tag) => esc_html($tag->name), $tags));
+        return implode('، ', array_map(static fn($tag) => BotPress_Markdown::escape($tag->name), $tags));
     }
 
     public static function available_variables(): array {

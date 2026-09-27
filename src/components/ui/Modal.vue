@@ -1,26 +1,24 @@
 <template>
-  <Teleport to="body">
-    <Transition name="modal-fade">
-      <div
-        v-if="modelValue"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
-        @click.self="close"
-      >
-        <Transition name="modal-slide" appear>
-          <div
-            class="w-full rounded-xl bg-white p-6 shadow-xl"
-            :class="sizeClasses"
-          >
-            <div class="mb-4 flex items-center justify-between">
-              <h3 class="text-base font-semibold text-slate-800">{{ title }}</h3>
-              <button class="text-slate-400 hover:text-slate-600" @click="close">✕</button>
-            </div>
-            <slot />
+  <Transition name="modal-fade">
+    <div
+      v-if="modelValue"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+      @click.self="close"
+    >
+      <Transition name="modal-slide" appear>
+        <div
+          class="w-full rounded-xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto"
+          :class="sizeClasses"
+        >
+          <div class="mb-4 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-800">{{ title }}</h3>
+            <button class="text-slate-400 hover:text-slate-600" aria-label="بستن" @click="close">✕</button>
           </div>
-        </Transition>
-      </div>
-    </Transition>
-  </Teleport>
+          <slot />
+        </div>
+      </Transition>
+    </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">

@@ -24,18 +24,17 @@ class BotPress_Search_Command extends BotPress_Base_Command {
         ]);
 
         if (empty($posts)) {
-            $text = '🔎 نتیجه‌ای برای «' . esc_html($query) . '» یافت نشد.';
+            $text = '🔎 نتیجه‌ای برای «' . $this->md($query) . '» یافت نشد.';
             return $driver->send_message($chat_id, $text);
         }
 
-        $text = '🔎 <b>نتایج جستجو برای «' . esc_html($query) . '»</b> (' . count($posts) . ")\n\n";
+        $text = '🔎 *نتایج جستجو برای «' . $this->md($query) . '»* (' . count($posts) . ")\n\n";
         $buttons = [];
         $i = 1;
         foreach ($posts as $post) {
-            $status = $post->post_status === 'publish' ? 'published' : $post->post_status;
-            $text .= "{$i}. " . esc_html($post->post_title) . " — <i>{$status}</i>\n";
+            $text .= "{$i}. " . $this->md($post->post_title) . ' — _' . $this->status_label($post->post_status) . "_\n";
             $buttons[] = [[
-                'text'          => "{$i}. جزئیات 🔍",
+                'text'          => "🔍 {$i}. جزئیات",
                 'callback_data' => 'post_detail:' . $post->ID,
             ]];
             $i++;

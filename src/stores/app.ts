@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 export const useAppStore = defineStore('app', {
   state: () => ({
     sidebarCollapsed: false,
-    pageTitle: 'Dashboard',
+    pageTitle: 'پیشخوان',
     botConnected: false,
   }),
   actions: {

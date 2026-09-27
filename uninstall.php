@@ -25,6 +25,7 @@ $options = [
     'botpress_templates',
     'botpress_notify_on_publish',
     'botpress_notify_on_fail',
+    'botpress_ai_settings',
 ];
 
 foreach ($options as $option) {

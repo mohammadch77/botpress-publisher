@@ -1,12 +1,12 @@
 <template>
   <div class="overflow-x-auto rounded-xl border border-surface-3">
-    <table class="w-full text-left text-sm">
+    <table class="w-full text-start text-sm">
       <thead class="sticky top-0 bg-surface-1">
         <tr>
           <th
             v-for="column in columns"
             :key="column.key"
-            class="border-b border-surface-3 px-4 py-3 font-semibold text-slate-600"
+            class="border-b border-surface-3 px-4 py-3 text-start font-semibold text-slate-600"
           >
             {{ column.label }}
           </th>
@@ -55,6 +55,6 @@ withDefaults(
     loading?: boolean
     emptyMessage?: string
   }>(),
-  { loading: false, emptyMessage: 'No data available' }
+  { loading: false, emptyMessage: 'داده‌ای برای نمایش وجود ندارد' }
 )
 </script>

@@ -1,6 +1,6 @@
 <template>
   <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-    <Card title="Message Templates">
+    <Card title="قالب پیام‌ها">
       <div class="flex flex-col gap-4">
         <div class="flex gap-2">
           <button
@@ -21,6 +21,13 @@
         />
         <p class="text-xs" :class="charCount > 4096 ? 'text-red-500' : 'text-slate-400'">
           {{ charCount }} / 4096 کاراکتر (محدودیت تلگرام)
+        </p>
+        <p class="rounded-lg bg-surface-1 px-3 py-2 text-xs leading-6 text-slate-500">
+          قالب‌بندی Markdown (هم تلگرام و هم بله):
+          <code dir="ltr" class="font-mono">*پررنگ*</code> ·
+          <code dir="ltr" class="font-mono">_کج_</code> ·
+          <code dir="ltr" class="font-mono">`کد`</code> ·
+          <code dir="ltr" class="font-mono">[متن لینک]({url})</code>
         </p>
 
         <div class="flex flex-wrap gap-2">
@@ -43,10 +50,10 @@
       </div>
     </Card>
 
-    <Card title="Preview">
+    <Card title="پیش‌نمایش">
       <div class="rounded-lg border border-surface-3 bg-surface-1 p-4">
         <div class="mx-auto max-w-sm rounded-2xl bg-[#5288c1] p-3">
-          <div class="whitespace-pre-wrap rounded-lg rounded-tl-none bg-white p-3 text-sm text-slate-800 shadow-sm" v-html="preview" />
+          <div class="whitespace-pre-wrap rounded-lg rounded-tl-none bg-white p-3 text-sm text-slate-800 shadow-sm" v-html="previewHtml" />
         </div>
       </div>
     </Card>
@@ -60,6 +67,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import { api } from '@/utils/api'
 import { useToast } from '@/composables/useToast'
+import { renderBotMarkdown } from '@/utils/markdown'
 
 const toast = useToast()
 
@@ -80,6 +88,7 @@ const previewing = ref(false)
 const copiedVariable = ref('')
 
 const charCount = computed(() => templates[activeTab.value]?.length ?? 0)
+const previewHtml = computed(() => renderBotMarkdown(preview.value))
 
 onMounted(async () => {
   const { data } = await api.get('/templates')

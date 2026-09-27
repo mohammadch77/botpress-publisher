@@ -1,8 +1,10 @@
 <template>
-  <AppLayout>
-    <router-view />
-  </AppLayout>
-  <Toast :toasts="toasts" />
+  <div id="botpress-root" dir="rtl" lang="fa">
+    <AppLayout>
+      <router-view />
+    </AppLayout>
+    <Toast :toasts="toasts" />
+  </div>
 </template>
 
 <script setup lang="ts">

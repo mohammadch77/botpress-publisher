@@ -2,8 +2,8 @@
 /**
  * Plugin Name: BotPress Publisher
  * Plugin URI: https://github.com/mohammadch77/botpress-publisher
- * Description: Publish WordPress posts to Telegram and Bale channels via Bot
- * Version: 1.0.0
+ * Description: انتشار مقاله‌های وردپرس در کانال‌های تلگرام و بله با ربات، و تولید مقالهٔ سئوشده با هوش مصنوعی
+ * Version: 1.1.0
  * Author: Mohammad
  * License: GPL v2 or later
  * Text Domain: botpress-publisher
@@ -11,7 +11,7 @@
 
 defined('ABSPATH') || exit;
 
-define('BOTPRESS_VERSION', '1.0.0');
+define('BOTPRESS_VERSION', '1.1.0');
 define('BOTPRESS_FILE', __FILE__);
 define('BOTPRESS_PATH', plugin_dir_path(__FILE__));
 define('BOTPRESS_URL', plugin_dir_url(__FILE__));
@@ -22,15 +22,21 @@ require_once BOTPRESS_PATH . 'includes/class-error-handler.php';
 require_once BOTPRESS_PATH . 'includes/class-activator.php';
 require_once BOTPRESS_PATH . 'includes/class-deactivator.php';
 require_once BOTPRESS_PATH . 'includes/helpers/class-encryption.php';
+require_once BOTPRESS_PATH . 'includes/helpers/class-markdown.php';
+require_once BOTPRESS_PATH . 'includes/helpers/class-debug-log.php';
 require_once BOTPRESS_PATH . 'includes/helpers/class-template-engine.php';
-require_once BOTPRESS_PATH . 'includes/api/class-rest-api.php';
 require_once BOTPRESS_PATH . 'includes/bot/interface-bot-driver.php';
 require_once BOTPRESS_PATH . 'includes/bot/class-telegram-driver.php';
 require_once BOTPRESS_PATH . 'includes/bot/class-bale-driver.php';
 require_once BOTPRESS_PATH . 'includes/bot/class-driver-factory.php';
+require_once BOTPRESS_PATH . 'includes/helpers/class-chat-id-resolver.php';
+require_once BOTPRESS_PATH . 'includes/api/class-rest-api.php';
+require_once BOTPRESS_PATH . 'includes/ai/class-ai-settings.php';
+require_once BOTPRESS_PATH . 'includes/ai/class-ai-rest.php';
 require_once BOTPRESS_PATH . 'includes/bot/class-webhook-handler.php';
 require_once BOTPRESS_PATH . 'includes/bot/class-command-router.php';
 require_once BOTPRESS_PATH . 'includes/bot/class-message-builder.php';
+require_once BOTPRESS_PATH . 'includes/bot/class-notifier.php';
 require_once BOTPRESS_PATH . 'includes/bot/commands/class-base-command.php';
 require_once BOTPRESS_PATH . 'includes/bot/commands/class-start-command.php';
 require_once BOTPRESS_PATH . 'includes/bot/commands/class-posts-command.php';

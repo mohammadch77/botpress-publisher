@@ -1,14 +1,18 @@
 <template>
   <div class="flex flex-col gap-6">
     <div class="flex items-center justify-between">
-      <p class="text-sm text-slate-500">Manage the Telegram and Bale channels you publish to.</p>
-      <Button variant="primary" :icon-left="Plus" @click="openAddModal">Add Channel</Button>
+      <p class="text-sm text-slate-500">کانال‌های تلگرام و بله‌ای که مقاله‌ها در آن‌ها منتشر می‌شوند را مدیریت کنید.</p>
+      <Button variant="primary" :icon-left="Plus" @click="openAddModal">افزودن کانال</Button>
     </div>
 
     <Card>
-      <Table :columns="columns" :rows="channels" :loading="loading" empty-message="No channels configured yet">
+      <Table :columns="columns" :rows="channels" :loading="loading" empty-message="هنوز کانالی اضافه نشده است">
         <template #cell-platform="{ row }">
-          <Badge :variant="row.platform === 'telegram' ? 'info' : 'success'">{{ row.platform }}</Badge>
+          <Badge :variant="row.platform === 'telegram' ? 'info' : 'success'">{{ labelOf(platformLabels, row.platform) }}</Badge>
+        </template>
+        <template #cell-chat_id="{ row }">
+          <span dir="ltr">{{ row.chat_id }}</span>
+          <span v-if="row.bot_username" dir="ltr" class="ms-1 text-xs text-slate-400">(@{{ row.bot_username }})</span>
         </template>
         <template #cell-is_active="{ row }">
           <span :title="row.last_error || ''" class="flex items-center gap-2">
@@ -21,8 +25,8 @@
         <template #cell-actions="{ row }">
           <div class="flex flex-col gap-1">
             <div class="flex gap-2">
-              <Button variant="ghost" size="sm" :loading="testingId === row.id" @click="testChannel(row as Channel)">Test</Button>
-              <Button variant="ghost" size="sm" @click="confirmDelete(row as Channel)">Delete</Button>
+              <Button variant="ghost" size="sm" :loading="testingId === row.id" @click="testChannel(row as Channel)">تست اتصال</Button>
+              <Button variant="ghost" size="sm" @click="confirmDelete(row as Channel)">حذف</Button>
             </div>
             <p v-if="testResults[row.id]" class="text-xs" :class="testResults[row.id].success ? 'text-emerald-600' : 'text-red-500'">
               {{ testResults[row.id].success ? `متصل: @${testResults[row.id].bot_username || ''}` : testResults[row.id].message }}
@@ -32,30 +36,34 @@
       </Table>
     </Card>
 
-    <Modal v-model="showModal" title="Add Channel">
+    <Modal v-model="showModal" title="افزودن کانال">
       <div class="flex flex-col gap-4">
-        <Input v-model="form.name" label="Name" placeholder="My Telegram Channel" />
+        <Input v-model="form.name" label="نام کانال" placeholder="مثلاً کانال خبری سایت" />
         <Select
           v-model="form.platform"
-          label="Platform"
+          label="پلتفرم"
           :options="[
-            { label: 'Telegram', value: 'telegram' },
-            { label: 'Bale', value: 'bale' },
+            { label: 'تلگرام', value: 'telegram' },
+            { label: 'بله', value: 'bale' },
           ]"
         />
-        <Input v-model="form.chat_id" label="Chat ID" placeholder="-1001234567890" />
-        <Input v-model="form.bot_token" label="Bot Token" type="password" placeholder="123456:ABC-DEF..." />
+        <Input
+          v-model="form.chat_id"
+          label="لینک کانال / یوزرنیم / Chat ID"
+          placeholder="@channel یا https://t.me/channel یا -1001234567890"
+        />
+        <Input v-model="form.bot_token" label="توکن ربات" type="password" placeholder="123456:ABC-DEF..." />
         <p v-if="formError" class="text-sm text-red-500">{{ formError }}</p>
         <div class="flex justify-end gap-2">
-          <Button variant="ghost" @click="showModal = false">Cancel</Button>
-          <Button variant="primary" :loading="saving" @click="saveChannel">Save</Button>
+          <Button variant="ghost" @click="showModal = false">انصراف</Button>
+          <Button variant="primary" :loading="saving" @click="saveChannel">ذخیره</Button>
         </div>
       </div>
     </Modal>
 
     <ConfirmDialog
       v-model="showDeleteModal"
-      title="Delete Channel"
+      title="حذف کانال"
       :message="`آیا از حذف کانال «${channelToDelete?.name}» مطمئن هستید؟`"
       :loading="deleting"
       @confirm="deleteChannel"
@@ -78,6 +86,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { api } from '@/utils/api'
 import { useToast } from '@/composables/useToast'
 import type { Channel } from '@/types'
+import { formatSiteDate, labelOf, platformLabels } from '@/utils/format'
 
 const toast = useToast()
 const loading = ref(true)
@@ -93,11 +102,11 @@ const form = reactive({ name: '', platform: 'telegram', chat_id: '', bot_token: 
 const testResults = reactive<Record<number, { success: boolean; message?: string; bot_username?: string }>>({})
 
 const columns = [
-  { key: 'name', label: 'Name' },
-  { key: 'platform', label: 'Platform' },
-  { key: 'chat_id', label: 'Chat ID' },
-  { key: 'is_active', label: 'Status' },
-  { key: 'last_used_at', label: 'Last Used' },
+  { key: 'name', label: 'نام' },
+  { key: 'platform', label: 'پلتفرم' },
+  { key: 'chat_id', label: 'شناسهٔ کانال' },
+  { key: 'is_active', label: 'وضعیت' },
+  { key: 'last_used_at', label: 'آخرین استفاده' },
   { key: 'actions', label: '' },
 ]
 
@@ -125,16 +134,18 @@ async function saveChannel() {
     formError.value = 'همه فیلدها الزامی هستند.'
     return
   }
-  if (!form.chat_id.startsWith('-')) {
-    formError.value = 'شناسه کانال باید با - شروع شود.'
-    return
-  }
   saving.value = true
   formError.value = ''
   try {
-    await api.post('/channels', { ...form })
+    const { data } = await api.post('/channels', { ...form })
     showModal.value = false
-    toast.success('کانال با موفقیت اضافه شد.')
+    if (data.notice === 'private_invite_unresolved') {
+      toast.success('کانال اضافه شد؛ چون لینک دعوت خصوصی بود، برای تایید اتصال روی «تست اتصال» بزنید.')
+    } else if (data.notice) {
+      toast.success('کانال اضافه شد؛ اتصال هنوز تایید نشده — روی «تست اتصال» بزنید.')
+    } else {
+      toast.success('کانال با موفقیت اضافه شد.')
+    }
     await loadChannels()
   } catch (e: any) {
     formError.value = e?.response?.data?.message || 'خطا در ذخیره کانال.'
@@ -177,7 +188,7 @@ async function deleteChannel() {
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString()
+  return formatSiteDate(value)
 }
 
 onMounted(loadChannels)

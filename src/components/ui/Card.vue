@@ -1,8 +1,8 @@
 <template>
   <div
     class="rounded-xl border border-surface-3 bg-white shadow-sm transition-shadow"
-    :class="[hover ? 'hover:shadow-md' : '', accentColor ? 'border-l-4' : '']"
-    :style="accentColor ? { borderLeftColor: accentColor } : {}"
+    :class="[hover ? 'hover:shadow-md' : '', accentColor ? 'border-s-4' : '']"
+    :style="accentColor ? { borderInlineStartColor: accentColor } : {}"
   >
     <div v-if="title || $slots.action" class="flex items-center justify-between border-b border-surface-3 px-5 py-4">
       <h3 v-if="title" class="text-sm font-semibold text-slate-800">{{ title }}</h3>

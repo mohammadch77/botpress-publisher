@@ -3,6 +3,47 @@
 defined('ABSPATH') || exit;
 
 class BotPress_Queue_Manager {
+    /** Quick-schedule options shared by the bot keyboard and the admin panel. */
+    public static function presets(): array {
+        return [
+            '+1hour'      => '⚡ ۱ ساعت دیگر',
+            '+3hours'     => '🕒 ۳ ساعت دیگر',
+            'tomorrow_8'  => '🌅 فردا ۸ صبح',
+            'tomorrow_12' => '☀️ فردا ۱۲ ظهر',
+            'day_after_8' => '📅 پس‌فردا ۸ صبح',
+        ];
+    }
+
+    /** Resolves a preset key to a site-local 'Y-m-d H:i:s' string (the format stored in scheduled_at). */
+    public static function preset_time(string $key): ?string {
+        $now = current_time('timestamp');
+
+        return match ($key) {
+            '+1hour'      => date('Y-m-d H:i:s', $now + HOUR_IN_SECONDS),
+            '+3hours'     => date('Y-m-d H:i:s', $now + 3 * HOUR_IN_SECONDS),
+            'tomorrow_8'  => date('Y-m-d 08:00:00', $now + DAY_IN_SECONDS),
+            'tomorrow_12' => date('Y-m-d 12:00:00', $now + DAY_IN_SECONDS),
+            'day_after_8' => date('Y-m-d 08:00:00', $now + 2 * DAY_IN_SECONDS),
+            default       => null,
+        };
+    }
+
+    /** scheduled_at is site-local time, so compare against site-local "now", not time() (UTC). */
+    public static function is_future(string $scheduled_at): bool {
+        $timestamp = strtotime($scheduled_at);
+        return $timestamp !== false && $timestamp > current_time('timestamp');
+    }
+
+    public function find_pending_for_post(int $post_id): ?object {
+        global $wpdb;
+        return $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}botpress_publish_queue
+             WHERE post_id = %d AND status = 'pending'
+             ORDER BY scheduled_at ASC LIMIT 1",
+            $post_id
+        )) ?: null;
+    }
+
     public function add(int $post_id, string $scheduled_at, string $target = 'both', ?int $channel_id = null) {
         global $wpdb;
 
@@ -10,10 +51,10 @@ class BotPress_Queue_Manager {
             return false;
         }
 
-        $timestamp = strtotime($scheduled_at);
-        if (!$timestamp || $timestamp < time()) {
+        if (!self::is_future($scheduled_at)) {
             return false;
         }
+        $scheduled_at = date('Y-m-d H:i:s', strtotime($scheduled_at));
 
         if ($channel_id !== null) {
             $existing = $wpdb->get_var($wpdb->prepare(
@@ -33,6 +74,17 @@ class BotPress_Queue_Manager {
         }
 
         if ($existing) {
+            $wpdb->update(
+                $wpdb->prefix . 'botpress_publish_queue',
+                [
+                    'scheduled_at'   => $scheduled_at,
+                    'publish_target' => $target,
+                    'attempts'       => 0,
+                    'last_error'     => null,
+                    'updated_at'     => current_time('mysql'),
+                ],
+                ['id' => (int) $existing]
+            );
             return (int) $existing;
         }
 
@@ -56,7 +108,7 @@ class BotPress_Queue_Manager {
         return (bool) $wpdb->update(
             $wpdb->prefix . 'botpress_publish_queue',
             [
-                'status'     => 'failed',
+                'status'     => 'cancelled',
                 'last_error' => 'لغو شده توسط کاربر',
                 'updated_at' => current_time('mysql'),
             ],
@@ -77,13 +129,13 @@ class BotPress_Queue_Manager {
         );
     }
 
-    public function cancel_by_post(int $post_id): bool {
+    public function cancel_by_post(int $post_id, string $reason = 'لغو شده توسط کاربر'): bool {
         global $wpdb;
         return (bool) $wpdb->update(
             $wpdb->prefix . 'botpress_publish_queue',
             [
-                'status'     => 'failed',
-                'last_error' => 'لغو شده توسط کاربر',
+                'status'     => 'cancelled',
+                'last_error' => $reason,
                 'updated_at' => current_time('mysql'),
             ],
             ['post_id' => $post_id, 'status' => 'pending']
@@ -155,7 +207,7 @@ class BotPress_Queue_Manager {
             $wpdb->prefix . 'botpress_publish_queue',
             [
                 'status'       => 'pending',
-                'scheduled_at' => date('Y-m-d H:i:s', time() + max(1, $delay_seconds)),
+                'scheduled_at' => date('Y-m-d H:i:s', current_time('timestamp') + max(1, $delay_seconds)),
                 'last_error'   => 'محدودیت نرخ ارسال؛ تلاش مجدد زمان‌بندی شد',
                 'updated_at'   => current_time('mysql'),
             ],

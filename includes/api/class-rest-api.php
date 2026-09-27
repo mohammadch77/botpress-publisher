@@ -62,12 +62,12 @@ class BotPress_REST_API {
                     'telegram_token' => [
                         'type'              => 'string',
                         'required'          => false,
-                        'validate_callback' => static fn($v) => $v === '' || $v === null || strlen((string) $v) >= 20,
+                        'validate_callback' => [$this, 'validate_bot_token'],
                     ],
                     'bale_token' => [
                         'type'              => 'string',
                         'required'          => false,
-                        'validate_callback' => static fn($v) => $v === '' || $v === null || strlen((string) $v) >= 20,
+                        'validate_callback' => [$this, 'validate_bot_token'],
                     ],
                     'authorized_users' => [
                         'required'          => false,
@@ -125,12 +125,13 @@ class BotPress_REST_API {
                         'validate_callback' => static fn($v) => (bool) get_post((int) $v),
                     ],
                     'scheduled_at' => [
+                        'type'     => 'string',
+                        'required' => false,
+                    ],
+                    'preset' => [
                         'type'              => 'string',
-                        'required'          => true,
-                        'validate_callback' => static function ($v) {
-                            $ts = strtotime((string) $v);
-                            return $ts !== false && $ts > time();
-                        },
+                        'required'          => false,
+                        'validate_callback' => static fn($v) => $v === '' || array_key_exists((string) $v, BotPress_Queue_Manager::presets()),
                     ],
                     'target' => [
                         'type'              => 'string',
@@ -166,6 +167,12 @@ class BotPress_REST_API {
         register_rest_route($this->namespace, '/posts', [
             'methods'             => 'GET',
             'callback'            => [$this, 'get_posts'],
+            'permission_callback' => [$this, 'check_permission'],
+        ]);
+
+        register_rest_route($this->namespace, '/schedule/presets', [
+            'methods'             => 'GET',
+            'callback'            => [$this, 'get_schedule_presets'],
             'permission_callback' => [$this, 'check_permission'],
         ]);
 
@@ -233,6 +240,30 @@ class BotPress_REST_API {
             'permission_callback' => [$this, 'check_permission'],
         ]);
 
+        register_rest_route($this->namespace, '/webhook/status', [
+            'methods'             => 'GET',
+            'callback'            => [$this, 'webhook_status'],
+            'permission_callback' => [$this, 'check_permission'],
+        ]);
+
+        register_rest_route($this->namespace, '/bot/debug-log', [
+            [
+                'methods'             => 'GET',
+                'callback'            => static fn(WP_REST_Request $r) => new WP_REST_Response([
+                    'entries' => BotPress_Debug_Log::all(sanitize_text_field((string) $r->get_param('platform'))),
+                ], 200),
+                'permission_callback' => [$this, 'check_permission'],
+            ],
+            [
+                'methods'             => 'DELETE',
+                'callback'            => static function () {
+                    BotPress_Debug_Log::clear();
+                    return new WP_REST_Response(['success' => true], 200);
+                },
+                'permission_callback' => [$this, 'check_permission'],
+            ],
+        ]);
+
         // Webhook endpoints — no auth, signature/secret verified inside the handler.
         register_rest_route($this->namespace, '/webhook/telegram', [
             'methods'             => 'POST',
@@ -294,17 +325,28 @@ class BotPress_REST_API {
             'chat_id' => [
                 'type'              => 'string',
                 'required'          => $required,
-                'validate_callback' => static fn($v) => $v === null || (bool) preg_match('/^-?\d+$/', (string) $v),
+                'validate_callback' => static fn($v) => $v === null || (strlen((string) $v) > 0 && strlen((string) $v) <= 191),
             ],
             'bot_token' => [
                 'type'              => 'string',
                 'required'          => $required,
-                'validate_callback' => static fn($v) => $v === null || $v === '' || strlen((string) $v) >= 20,
+                'validate_callback' => fn($v) => $v === null || $this->validate_bot_token($v),
             ],
             'is_active' => [
                 'required' => false,
             ],
         ];
+    }
+
+    public function validate_bot_token($value) {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return true;
+        }
+        if (!preg_match('/^\d+:[A-Za-z0-9_\-]+$/', $value)) {
+            return new WP_Error('invalid_token_format', 'فرمت توکن نامعتبر است. توکن باید به شکل 123456789:ABCdef... باشد.', ['status' => 400]);
+        }
+        return true;
     }
 
     public function validate_template_string($value): bool {
@@ -332,7 +374,7 @@ class BotPress_REST_API {
         $channels_count = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}botpress_channels");
 
         $published_today = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$wpdb->prefix}botpress_publish_queue WHERE status = 'published' AND DATE(published_at) = CURDATE()"
+            $wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}botpress_publish_queue WHERE status = 'published' AND DATE(published_at) = %s", current_time('Y-m-d'))
         );
 
         $pending_queue = (int) $wpdb->get_var(
@@ -340,7 +382,7 @@ class BotPress_REST_API {
         );
 
         $failed_today = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$wpdb->prefix}botpress_publish_queue WHERE status = 'failed' AND DATE(updated_at) = CURDATE()"
+            $wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}botpress_publish_queue WHERE status = 'failed' AND DATE(updated_at) = %s", current_time('Y-m-d'))
         );
 
         $recent_logs = $wpdb->get_results(
@@ -379,11 +421,16 @@ class BotPress_REST_API {
 
         $name = sanitize_text_field((string) $request->get_param('name'));
         $platform = sanitize_text_field((string) $request->get_param('platform'));
-        $chat_id = sanitize_text_field((string) $request->get_param('chat_id'));
-        $bot_token = (string) $request->get_param('bot_token');
+        $chat_id_input = sanitize_text_field((string) $request->get_param('chat_id'));
+        $bot_token = trim((string) $request->get_param('bot_token'));
 
-        if (!$name || !in_array($platform, ['telegram', 'bale'], true) || !$chat_id || !$bot_token) {
+        if (!$name || !in_array($platform, ['telegram', 'bale'], true) || !$chat_id_input || !$bot_token) {
             return new WP_REST_Response(['success' => false, 'message' => 'invalid_params'], 400);
+        }
+
+        $resolved = BotPress_Chat_Id_Resolver::resolve($chat_id_input, $platform, $bot_token);
+        if (!$resolved['success']) {
+            return new WP_REST_Response(['success' => false, 'message' => $resolved['message'] ?? 'invalid_chat_id'], 400);
         }
 
         $now = current_time('mysql');
@@ -391,14 +438,21 @@ class BotPress_REST_API {
         $wpdb->insert($wpdb->prefix . 'botpress_channels', [
             'name'          => $name,
             'platform'      => $platform,
-            'chat_id'       => $chat_id,
+            'chat_id'       => $resolved['chat_id'],
+            'bot_username'  => $resolved['bot_username'] ?? null,
             'bot_token_enc' => BotPress_Encryption::encrypt($bot_token),
             'is_active'     => 1,
             'created_at'    => $now,
             'updated_at'    => $now,
         ]);
 
-        return new WP_REST_Response(['success' => true, 'id' => $wpdb->insert_id], 200);
+        return new WP_REST_Response([
+            'success'  => true,
+            'id'       => $wpdb->insert_id,
+            'chat_id'  => $resolved['chat_id'],
+            'resolved' => $resolved['resolved'] ?? false,
+            'notice'   => $resolved['message'] ?? null,
+        ], 200);
     }
 
     public function update_channel(WP_REST_Request $request): WP_REST_Response {
@@ -406,23 +460,48 @@ class BotPress_REST_API {
         $id = (int) $request->get_param('id');
 
         $data = ['updated_at' => current_time('mysql')];
+        $notice = null;
 
         if ($request->get_param('name') !== null) {
             $data['name'] = sanitize_text_field((string) $request->get_param('name'));
         }
+
         if ($request->get_param('chat_id') !== null) {
-            $data['chat_id'] = sanitize_text_field((string) $request->get_param('chat_id'));
+            $existing = $wpdb->get_row($wpdb->prepare(
+                "SELECT platform, bot_token_enc FROM {$wpdb->prefix}botpress_channels WHERE id = %d", $id
+            ));
+            $platform = (string) ($request->get_param('platform') ?? ($existing->platform ?? 'telegram'));
+            $token = $request->get_param('bot_token')
+                ? trim((string) $request->get_param('bot_token'))
+                : ($existing ? BotPress_Encryption::decrypt($existing->bot_token_enc) : '');
+
+            $resolved = BotPress_Chat_Id_Resolver::resolve(
+                sanitize_text_field((string) $request->get_param('chat_id')),
+                $platform,
+                $token
+            );
+
+            if (!$resolved['success']) {
+                return new WP_REST_Response(['success' => false, 'message' => $resolved['message'] ?? 'invalid_chat_id'], 400);
+            }
+
+            $data['chat_id'] = $resolved['chat_id'];
+            if (!empty($resolved['bot_username'])) {
+                $data['bot_username'] = $resolved['bot_username'];
+            }
+            $notice = $resolved['message'] ?? null;
         }
+
         if ($request->get_param('is_active') !== null) {
             $data['is_active'] = $request->get_param('is_active') ? 1 : 0;
         }
         if ($request->get_param('bot_token')) {
-            $data['bot_token_enc'] = BotPress_Encryption::encrypt((string) $request->get_param('bot_token'));
+            $data['bot_token_enc'] = BotPress_Encryption::encrypt(trim((string) $request->get_param('bot_token')));
         }
 
         $wpdb->update($wpdb->prefix . 'botpress_channels', $data, ['id' => $id]);
 
-        return new WP_REST_Response(['success' => true, 'id' => $id], 200);
+        return new WP_REST_Response(['success' => true, 'id' => $id, 'notice' => $notice], 200);
     }
 
     public function delete_channel(WP_REST_Request $request): WP_REST_Response {
@@ -507,14 +586,16 @@ class BotPress_REST_API {
     }
 
     public function save_settings(WP_REST_Request $request): WP_REST_Response {
-        $telegram_token = $request->get_param('telegram_token');
-        $bale_token = $request->get_param('bale_token');
-
-        if (!empty($telegram_token)) {
-            update_option('botpress_bot_token_telegram_enc', BotPress_Encryption::encrypt((string) $telegram_token));
-        }
-        if (!empty($bale_token)) {
-            update_option('botpress_bot_token_bale_enc', BotPress_Encryption::encrypt((string) $bale_token));
+        foreach (['telegram', 'bale'] as $platform) {
+            $token = trim((string) $request->get_param("{$platform}_token"));
+            if ($token === '') {
+                continue;
+            }
+            $previous = BotPress_Encryption::decrypt((string) get_option("botpress_bot_token_{$platform}_enc", ''));
+            update_option("botpress_bot_token_{$platform}_enc", BotPress_Encryption::encrypt($token));
+            if ($previous !== $token) {
+                update_option("botpress_webhook_set_{$platform}", false);
+            }
         }
 
         if ($request->get_param('authorized_users') !== null) {
@@ -661,12 +742,10 @@ class BotPress_REST_API {
         );
         $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}botpress_publish_queue");
 
+        // Vue escapes on render; sending entity-encoded text would display "&amp;" literally.
         foreach ($items as $item) {
             if (isset($item->post_title)) {
-                $item->post_title = esc_html($item->post_title);
-            }
-            if (isset($item->last_error) && $item->last_error !== null) {
-                $item->last_error = esc_html($item->last_error);
+                $item->post_title = html_entity_decode((string) $item->post_title, ENT_QUOTES, 'UTF-8');
             }
         }
 
@@ -675,42 +754,62 @@ class BotPress_REST_API {
 
     public function add_to_queue(WP_REST_Request $request): WP_REST_Response {
         $post_id = (int) $request->get_param('post_id');
-        $scheduled_at = (string) $request->get_param('scheduled_at');
+        $preset = (string) $request->get_param('preset');
+        $scheduled_at = $preset !== ''
+            ? (string) BotPress_Queue_Manager::preset_time($preset)
+            : (string) $request->get_param('scheduled_at');
         $target = (string) ($request->get_param('target') ?: 'both');
         $channel_id = $request->get_param('channel_id');
         $channel_id = $channel_id ? (int) $channel_id : null;
 
-        if (!$post_id || !get_post($post_id)) {
-            return new WP_REST_Response(['success' => false, 'message' => 'post_not_found'], 404);
+        $post = $post_id ? get_post($post_id) : null;
+        if (!$post) {
+            return new WP_REST_Response(['success' => false, 'message' => 'مقاله یافت نشد.'], 404);
         }
 
-        $timestamp = strtotime($scheduled_at);
-        if (!$timestamp) {
-            return new WP_REST_Response(['success' => false, 'message' => 'invalid_scheduled_at'], 400);
+        if ($scheduled_at === '' || strtotime($scheduled_at) === false) {
+            return new WP_REST_Response(['success' => false, 'message' => 'زمان انتشار نامعتبر است.'], 400);
+        }
+        $scheduled_at = date('Y-m-d H:i:s', strtotime($scheduled_at));
+
+        if (!BotPress_Queue_Manager::is_future($scheduled_at)) {
+            return new WP_REST_Response(['success' => false, 'message' => 'زمان انتخاب‌شده گذشته است. یک زمان در آینده انتخاب کنید.'], 400);
         }
 
         if (!in_array($target, ['wordpress', 'channel', 'both'], true)) {
-            return new WP_REST_Response(['success' => false, 'message' => 'invalid_target'], 400);
+            return new WP_REST_Response(['success' => false, 'message' => 'مقصد انتشار نامعتبر است.'], 400);
         }
 
-        $queue_id = (new BotPress_Queue_Manager())->add(
-            $post_id,
-            date('Y-m-d H:i:s', $timestamp),
-            $target,
-            $channel_id
-        );
+        $queue_id = (new BotPress_Queue_Manager())->add($post_id, $scheduled_at, $target, $channel_id);
 
         if (!$queue_id) {
-            return new WP_REST_Response(['success' => false, 'message' => 'queue_insert_failed'], 500);
+            return new WP_REST_Response(['success' => false, 'message' => 'ثبت در صف انتشار ناموفق بود.'], 500);
         }
 
-        return new WP_REST_Response(['success' => true, 'id' => $queue_id], 200);
+        BotPress_Notifier::scheduled($post, $scheduled_at, (int) $queue_id, 'panel');
+
+        return new WP_REST_Response([
+            'success'      => true,
+            'id'           => $queue_id,
+            'scheduled_at' => $scheduled_at,
+            'message'      => 'زمان‌بندی برای ' . mysql2date('Y/m/d H:i', $scheduled_at) . ' ثبت شد.',
+        ], 200);
     }
 
     public function cancel_queue_item(WP_REST_Request $request): WP_REST_Response {
+        global $wpdb;
         $id = (int) $request->get_param('id');
+        $item = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}botpress_publish_queue WHERE id = %d", $id
+        ));
         $success = (new BotPress_Queue_Manager())->cancel($id);
-        return new WP_REST_Response(['success' => $success], $success ? 200 : 400);
+        if ($success && $item) {
+            BotPress_Notifier::cancelled($item, 'panel');
+        }
+        return new WP_REST_Response([
+            'success' => $success,
+            'message' => $success ? 'زمان‌بندی لغو شد.' : 'این مورد دیگر در انتظار نیست (منتشر یا لغو شده).',
+        ], $success ? 200 : 400);
     }
 
     public function retry_queue_item(WP_REST_Request $request): WP_REST_Response {
@@ -720,22 +819,75 @@ class BotPress_REST_API {
     }
 
     public function get_posts(WP_REST_Request $request): WP_REST_Response {
-        $posts = get_posts([
+        global $wpdb;
+
+        $status_map = ['draft' => ['draft'], 'publish' => ['publish'], 'future' => ['future'], 'pending' => ['pending']];
+        $status = (string) $request->get_param('status');
+        $per_page = max(1, min(50, (int) ($request->get_param('per_page') ?: 20)));
+        $page = max(1, (int) ($request->get_param('page') ?: 1));
+
+        $query = new WP_Query([
             'post_type'      => 'post',
-            'post_status'    => ['draft', 'publish', 'future'],
-            'posts_per_page' => 20,
-            'orderby'        => 'date',
+            'post_status'    => $status_map[$status] ?? ['draft', 'publish', 'future', 'pending'],
+            's'              => sanitize_text_field((string) $request->get_param('search')),
+            'posts_per_page' => $per_page,
+            'paged'          => $page,
+            'orderby'        => 'modified',
             'order'          => 'DESC',
         ]);
 
-        $data = array_map(static fn($post) => [
-            'id'     => $post->ID,
-            'title'  => $post->post_title,
-            'status' => $post->post_status,
-            'date'   => $post->post_date,
-        ], $posts);
+        $ids = wp_list_pluck($query->posts, 'ID');
+        $queued = [];
+        if ($ids) {
+            $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+            $rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT id, post_id, scheduled_at, publish_target FROM {$wpdb->prefix}botpress_publish_queue
+                 WHERE status = 'pending' AND post_id IN ({$placeholders}) ORDER BY scheduled_at ASC",
+                ...$ids
+            ));
+            foreach ($rows as $row) {
+                $queued[(int) $row->post_id] ??= $row;
+            }
+        }
 
-        return new WP_REST_Response(['posts' => $data], 200);
+        $data = array_map(static function (WP_Post $post) use ($queued) {
+            $q = $queued[$post->ID] ?? null;
+            return [
+                'id'         => $post->ID,
+                'title'      => html_entity_decode($post->post_title ?: '(بدون عنوان)', ENT_QUOTES, 'UTF-8'),
+                'status'     => $post->post_status,
+                'date'       => $post->post_date,
+                'modified'   => $post->post_modified,
+                'author'     => get_the_author_meta('display_name', $post->post_author),
+                'thumbnail'  => get_the_post_thumbnail_url($post, 'thumbnail') ?: null,
+                'edit_url'   => get_edit_post_link($post->ID, 'raw'),
+                'view_url'   => get_permalink($post),
+                'queue'      => $q ? [
+                    'id'           => (int) $q->id,
+                    'scheduled_at' => $q->scheduled_at,
+                    'target'       => $q->publish_target,
+                ] : null,
+            ];
+        }, $query->posts);
+
+        return new WP_REST_Response([
+            'posts'       => $data,
+            'total'       => (int) $query->found_posts,
+            'total_pages' => (int) $query->max_num_pages,
+            'page'        => $page,
+        ], 200);
+    }
+
+    public function get_schedule_presets(WP_REST_Request $request): WP_REST_Response {
+        $presets = [];
+        foreach (BotPress_Queue_Manager::presets() as $key => $label) {
+            $presets[] = ['key' => $key, 'label' => $label, 'at' => BotPress_Queue_Manager::preset_time($key)];
+        }
+        return new WP_REST_Response([
+            'presets'  => $presets,
+            'now'      => current_time('mysql'),
+            'timezone' => wp_timezone_string(),
+        ], 200);
     }
 
     public function get_templates(WP_REST_Request $request): WP_REST_Response {
@@ -778,29 +930,125 @@ class BotPress_REST_API {
 
         $result = (new BotPress_Publisher_Engine())->publish_now($post_id, $target, $channel_id);
 
-        return new WP_REST_Response($result, $result['success'] ? 200 : 400);
+        $post = get_post($post_id);
+        if ($post) {
+            if ($result['success']) {
+                (new BotPress_Queue_Manager())->cancel_by_post($post_id, 'منتشر شد (انتشار فوری از پنل)');
+                BotPress_Notifier::published($post, $result, 'panel');
+            } else {
+                BotPress_Notifier::failed($post, BotPress_Cron_Scheduler::first_error($result), 'panel');
+            }
+        }
+
+        $result['message'] = $result['success'] ? 'انتشار با موفقیت انجام شد.' : BotPress_Cron_Scheduler::first_error($result);
+
+        return new WP_REST_Response($result, 200);
     }
 
     public function set_webhook(WP_REST_Request $request): WP_REST_Response {
         $platform = sanitize_text_field((string) $request->get_param('platform'));
 
         if (!in_array($platform, ['telegram', 'bale'], true)) {
-            return new WP_REST_Response(['success' => false, 'message' => 'invalid_platform'], 400);
+            return new WP_REST_Response(['success' => false, 'message' => 'پلتفرم نامعتبر است.'], 400);
         }
 
         $driver = BotPress_Driver_Factory::make($platform);
         if (!$driver) {
-            return new WP_REST_Response(['success' => false, 'message' => 'no_token_configured'], 200);
+            return new WP_REST_Response(['success' => false, 'message' => 'ابتدا توکن ربات را ذخیره کنید.'], 200);
         }
 
-        $url = rest_url("botpress/v1/webhook/{$platform}");
-        $secret = $platform === 'telegram' ? get_option('botpress_webhook_secret', '') : '';
+        $url = $this->webhook_url($platform);
+        if (strpos($url, 'https://') !== 0) {
+            update_option("botpress_webhook_set_{$platform}", false);
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => 'آدرس وب‌هوک باید HTTPS باشد. آدرس فعلی: ' . $url,
+            ], 200);
+        }
 
+        $me = $driver->get_me();
+        if (!($me['ok'] ?? false)) {
+            update_option("botpress_webhook_set_{$platform}", false);
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => 'توکن نامعتبر است: ' . ($me['description'] ?? 'unknown_error'),
+            ], 200);
+        }
+
+        $secret = $platform === 'telegram' ? (string) get_option('botpress_webhook_secret', '') : '';
         $result = $driver->set_webhook($url, $secret);
-        $success = $result['ok'] ?? false;
 
-        update_option("botpress_webhook_set_{$platform}", $success);
+        if (!($result['ok'] ?? false)) {
+            update_option("botpress_webhook_set_{$platform}", false);
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => 'تنظیم وب‌هوک ناموفق بود: ' . ($result['description'] ?? 'unknown_error'),
+            ], 200);
+        }
 
-        return new WP_REST_Response(['success' => $success, 'result' => $result], 200);
+        update_option("botpress_webhook_set_{$platform}", true);
+
+        return new WP_REST_Response([
+            'success'      => true,
+            'message'      => 'وب‌هوک با موفقیت تنظیم شد.',
+            'bot_username' => $me['result']['username'] ?? null,
+            'webhook'      => $this->live_webhook_status($driver, $platform),
+        ], 200);
+    }
+
+    public function webhook_status(WP_REST_Request $request): WP_REST_Response {
+        $platform = sanitize_text_field((string) $request->get_param('platform'));
+        if (!in_array($platform, ['telegram', 'bale'], true)) {
+            return new WP_REST_Response(['success' => false, 'message' => 'پلتفرم نامعتبر است.'], 400);
+        }
+
+        $driver = BotPress_Driver_Factory::make($platform);
+        if (!$driver) {
+            return new WP_REST_Response(['success' => false, 'message' => 'ابتدا توکن ربات را ذخیره کنید.'], 200);
+        }
+
+        $status = $this->live_webhook_status($driver, $platform);
+        if ($status['checked']) {
+            update_option("botpress_webhook_set_{$platform}", $status['matches']);
+        }
+
+        return new WP_REST_Response(['success' => true, 'webhook' => $status], 200);
+    }
+
+    private function webhook_url(string $platform): string {
+        return rest_url("botpress/v1/webhook/{$platform}");
+    }
+
+    private function live_webhook_status(BotPress_Bot_Driver_Interface $driver, string $platform): array {
+        $expected = $this->webhook_url($platform);
+        $info = $driver->get_webhook_info();
+        $last_hit = (int) get_option("botpress_webhook_last_hit_{$platform}", 0);
+
+        if (!($info['ok'] ?? false)) {
+            return [
+                'checked'            => false,
+                'matches'            => (bool) get_option("botpress_webhook_set_{$platform}", false),
+                'expected_url'       => $expected,
+                'registered_url'     => null,
+                'pending_updates'    => null,
+                'last_error_message' => $info['description'] ?? null,
+                'last_received_at'   => $last_hit ? gmdate('c', $last_hit) : null,
+            ];
+        }
+
+        $result = $info['result'] ?? [];
+        $registered = (string) ($result['url'] ?? '');
+        $last_error_date = (int) ($result['last_error_date'] ?? 0);
+
+        return [
+            'checked'            => true,
+            'matches'            => $registered !== '' && untrailingslashit($registered) === untrailingslashit($expected),
+            'expected_url'       => $expected,
+            'registered_url'     => $registered ?: null,
+            'pending_updates'    => isset($result['pending_update_count']) ? (int) $result['pending_update_count'] : null,
+            'last_error_message' => $result['last_error_message'] ?? null,
+            'last_error_at'      => $last_error_date ? gmdate('c', $last_error_date) : null,
+            'last_received_at'   => $last_hit ? gmdate('c', $last_hit) : null,
+        ];
     }
 }
